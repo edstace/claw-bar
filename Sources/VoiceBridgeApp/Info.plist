@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.openclaw.voicebridge</string>
+    <key>CFBundleName</key>
+    <string>ClawBar</string>
+    <key>CFBundleDisplayName</key>
+    <string>ClawBar</string>
+    <key>CFBundleIconFile</key>
+    <string>ClawBarAppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>ClawBarAppIcon</string>
+    <key>CFBundleIcons</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFile</key>
+            <string>ClawBarAppIcon</string>
+        </dict>
+    </dict>
+    <key>CFBundleExecutable</key>
+    <string>VoiceBridgeApp</string>
+    <key>CFBundleVersion</key>
+    <string>2</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>ClawBar needs microphone access to capture speech for transcription.</string>
+</dict>
+</plist>

@@ -1,0 +1,22 @@
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+
+# Local runtime/build artifacts
+/dist/
+/memory/
+/.openclaw/
+
+# Local assistant/project metadata (not for public repo)
+/AGENTS.md
+/HEARTBEAT.md
+/IDENTITY.md
+/MEMORY.md
+/SOUL.md
+/TOOLS.md
+/USER.md
