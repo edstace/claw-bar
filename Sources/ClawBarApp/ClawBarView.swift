@@ -755,11 +755,6 @@ struct ClawBarView: View {
                                     .buttonStyle(.bordered)
                                     .disabled(model.isCheckingForUpdates)
 
-                                    Button("Check with Sparkle") {
-                                        model.checkViaSparkle()
-                                    }
-                                    .buttonStyle(.bordered)
-
                                     if model.hasUpdateReady {
                                         Button(model.isDownloadingUpdate ? "Downloading…" : "Install Update") {
                                             model.installAvailableUpdate()
@@ -808,6 +803,9 @@ struct ClawBarView: View {
                             settingsCard("API Key", systemImage: "key.fill") {
                                 Text(model.hasSavedAPIKey ? "A key is stored in Keychain." : "No API key stored yet.")
                                     .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                Text("Your API key is stored locally in your macOS Keychain and only used to make OpenAI requests from this app.")
+                                    .font(.caption2)
                                     .foregroundStyle(.secondary)
 
                                 SecureField("Enter new OpenAI API key", text: $replacementKey)
@@ -913,15 +911,47 @@ struct ClawBarView: View {
                                     .frame(width: 160)
                                 }
 
-                                Text("Style Prompt")
-                                    .font(.callout)
-                                    .foregroundStyle(.secondary)
-                                TextEditor(text: $model.voiceStylePrompt)
-                                    .font(.callout)
-                                    .frame(height: 84)
-                                    .padding(6)
-                                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
-                                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.18)))
+                                Group {
+                                    Text("Voice Style")
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                    TextField("e.g. warm, conversational, polished", text: $model.voiceStyle)
+                                        .textFieldStyle(.roundedBorder)
+
+                                    Text("Accent")
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                    TextField("e.g. neutral US, British RP, Australian", text: $model.voiceAccent)
+                                        .textFieldStyle(.roundedBorder)
+
+                                    Text("Tone")
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                    TextField("e.g. friendly, confident, empathetic", text: $model.voiceTone)
+                                        .textFieldStyle(.roundedBorder)
+
+                                    Text("Intonation")
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                    TextField("e.g. expressive but controlled", text: $model.voiceIntonation)
+                                        .textFieldStyle(.roundedBorder)
+
+                                    Text("Pace")
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                    TextField("e.g. medium, deliberate, brisk", text: $model.voicePace)
+                                        .textFieldStyle(.roundedBorder)
+
+                                    Text("Extra Instructions")
+                                        .font(.callout)
+                                        .foregroundStyle(.secondary)
+                                    TextEditor(text: $model.voiceCustomInstructions)
+                                        .font(.callout)
+                                        .frame(height: 72)
+                                        .padding(6)
+                                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
+                                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.18)))
+                                }
 
                                 HStack {
                                     Button("Save Voice Settings") {
@@ -990,13 +1020,6 @@ struct ClawBarView: View {
                         }
 
                         HStack {
-                            if settingsTab != .diagnostics {
-                                Button("Recheck Setup") {
-                                    settingsTab = .diagnostics
-                                    Task { await model.refreshSetupChecks() }
-                                }
-                                .buttonStyle(.bordered)
-                            }
                             Spacer()
                             Button("Done") {
                                 showingSettings = false

@@ -18,7 +18,12 @@ public final class ClawBarViewModel: ObservableObject {
     @Published var composerText: String = ""
     @Published var hasSavedAPIKey: Bool = false
     @Published var selectedVoice: String = "cedar"
-    @Published var voiceStylePrompt: String = ""
+    @Published var voiceStyle: String = ""
+    @Published var voiceAccent: String = ""
+    @Published var voiceTone: String = ""
+    @Published var voiceIntonation: String = ""
+    @Published var voicePace: String = ""
+    @Published var voiceCustomInstructions: String = ""
     @Published var transcript: String = ""
     @Published var chatEntries: [ChatEntry] = []
     @Published var pendingAttachments: [AttachmentItem] = []
@@ -62,7 +67,8 @@ public final class ClawBarViewModel: ObservableObject {
     private let liveTurnMaxSeconds: Duration = .seconds(6)
     private let voiceProfile = VoiceCallProfile.load()
     private let voiceSettingKey = "clawbar.settings.voice"
-    private let stylePromptSettingKey = "clawbar.settings.stylePrompt"
+    private let voiceStyleSettingsKey = "clawbar.settings.voiceStyleSettings.v2"
+    private let legacyStylePromptSettingKey = "clawbar.settings.stylePrompt"
     private let sttPresetSettingKey = "clawbar.settings.sttPreset"
     private let liveVoiceModeSettingKey = "clawbar.settings.liveVoiceMode"
     private let showReliabilityHUDSettingKey = "clawbar.settings.showReliabilityHUD"
@@ -70,7 +76,6 @@ public final class ClawBarViewModel: ObservableObject {
     private let updateSkippedVersionKey = "clawbar.updates.skippedVersion"
     private let updateRemindAfterKey = "clawbar.updates.remindAfter"
     private let sessionStore = SessionStore()
-    private var sparkleCheckAction: (() -> Void)?
 
     let availableVoices: [String] = [
         "alloy", "ash", "ballad", "cedar", "coral", "echo", "marin", "sage", "shimmer", "verse",
@@ -186,10 +191,6 @@ public final class ClawBarViewModel: ObservableObject {
 
     var hasUpdateReady: Bool {
         availableUpdateVersion != nil
-    }
-
-    func configureSparkleUpdateCheck(_ action: @escaping () -> Void) {
-        sparkleCheckAction = action
     }
 
     func checkForUpdatesIfDue() async {
@@ -321,10 +322,6 @@ public final class ClawBarViewModel: ObservableObject {
         updateReleaseNotes = ""
     }
 
-    func checkViaSparkle() {
-        sparkleCheckAction?()
-    }
-
     private func shouldSuppressUpdate(version: String) -> Bool {
         if let skipped = skippedUpdateVersion, skipped == version {
             return true
@@ -342,15 +339,27 @@ public final class ClawBarViewModel: ObservableObject {
         let voice = selectedVoice.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !voice.isEmpty else { return }
         selectedVoice = voice
+        let styleSettings = VoiceStyleSettings(
+            style: voiceStyle.trimmingCharacters(in: .whitespacesAndNewlines),
+            accent: voiceAccent.trimmingCharacters(in: .whitespacesAndNewlines),
+            tone: voiceTone.trimmingCharacters(in: .whitespacesAndNewlines),
+            intonation: voiceIntonation.trimmingCharacters(in: .whitespacesAndNewlines),
+            pace: voicePace.trimmingCharacters(in: .whitespacesAndNewlines),
+            customInstructions: voiceCustomInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        applyVoiceStyleSettings(styleSettings)
         let defaults = UserDefaults.standard
         defaults.set(voice, forKey: voiceSettingKey)
-        defaults.set(voiceStylePrompt, forKey: stylePromptSettingKey)
+        if let data = try? JSONEncoder().encode(styleSettings),
+           let encoded = String(data: data, encoding: .utf8) {
+            defaults.set(encoded, forKey: voiceStyleSettingsKey)
+        }
         statusMessage = "Voice settings saved"
     }
 
     func resetVoiceSettingsToProfile() {
         selectedVoice = voiceProfile.voice
-        voiceStylePrompt = voiceProfile.stylePrompt ?? ""
+        applyVoiceStyleSettings(voiceProfile.styleSettings)
         saveVoiceSettings()
     }
 
@@ -362,11 +371,36 @@ public final class ClawBarViewModel: ObservableObject {
             selectedVoice = voiceProfile.voice
         }
 
-        if let savedPrompt = defaults.string(forKey: stylePromptSettingKey) {
-            voiceStylePrompt = savedPrompt
+        if let encodedSettings = defaults.string(forKey: voiceStyleSettingsKey),
+           let data = encodedSettings.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode(VoiceStyleSettings.self, from: data) {
+            applyVoiceStyleSettings(decoded)
+        } else if let legacyPrompt = defaults.string(forKey: legacyStylePromptSettingKey) {
+            applyVoiceStyleSettings(VoiceStyleSettings(customInstructions: legacyPrompt))
         } else {
-            voiceStylePrompt = voiceProfile.stylePrompt ?? ""
+            applyVoiceStyleSettings(voiceProfile.styleSettings)
         }
+    }
+
+    private func applyVoiceStyleSettings(_ settings: VoiceStyleSettings) {
+        voiceStyle = settings.style
+        voiceAccent = settings.accent
+        voiceTone = settings.tone
+        voiceIntonation = settings.intonation
+        voicePace = settings.pace
+        voiceCustomInstructions = settings.customInstructions
+    }
+
+    private func voiceInstructionsPrompt() -> String? {
+        let prompt = VoiceStyleSettings(
+            style: voiceStyle,
+            accent: voiceAccent,
+            tone: voiceTone,
+            intonation: voiceIntonation,
+            pace: voicePace,
+            customInstructions: voiceCustomInstructions
+        ).composedPrompt()
+        return prompt.isEmpty ? nil : prompt
     }
 
     // MARK: - Recording
@@ -829,7 +863,7 @@ public final class ClawBarViewModel: ObservableObject {
                     text: text,
                     apiKey: trimmedKey,
                     voice: selectedVoice,
-                    instructions: voiceStylePrompt
+                    instructions: voiceInstructionsPrompt()
                 )
                 fileExtension = "wav"
             } catch {
@@ -1004,10 +1038,13 @@ public final class ClawBarViewModel: ObservableObject {
 
 private struct VoiceCallProfile {
     let voice: String
-    let stylePrompt: String?
+    let styleSettings: VoiceStyleSettings
 
     static func load() -> VoiceCallProfile {
-        let defaultProfile = VoiceCallProfile(voice: "cedar", stylePrompt: nil)
+        let defaultProfile = VoiceCallProfile(
+            voice: "cedar",
+            styleSettings: VoiceStyleSettings()
+        )
         guard let configURL = resolveOpenClawConfigURL(),
               let data = try? Data(contentsOf: configURL),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -1026,8 +1063,17 @@ private struct VoiceCallProfile {
             voice = configuredVoice
         }
 
-        let stylePrompt = config["responseSystemPrompt"] as? String
-        return VoiceCallProfile(voice: voice, stylePrompt: stylePrompt)
+        let stylePrompt = (config["responseSystemPrompt"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let settings = VoiceStyleSettings(
+            style: "",
+            accent: "",
+            tone: "",
+            intonation: "",
+            pace: "",
+            customInstructions: stylePrompt ?? ""
+        )
+        return VoiceCallProfile(voice: voice, styleSettings: settings)
     }
 
     private static func resolveOpenClawConfigURL() -> URL? {
@@ -1045,6 +1091,56 @@ private struct VoiceCallProfile {
         candidates.append(URL(fileURLWithPath: fm.currentDirectoryPath).appendingPathComponent("openclaw.json"))
 
         return candidates.first(where: { fm.fileExists(atPath: $0.path) })
+    }
+}
+
+private struct VoiceStyleSettings: Codable {
+    var style: String
+    var accent: String
+    var tone: String
+    var intonation: String
+    var pace: String
+    var customInstructions: String
+
+    init(
+        style: String = "",
+        accent: String = "",
+        tone: String = "",
+        intonation: String = "",
+        pace: String = "",
+        customInstructions: String = ""
+    ) {
+        self.style = style
+        self.accent = accent
+        self.tone = tone
+        self.intonation = intonation
+        self.pace = pace
+        self.customInstructions = customInstructions
+    }
+
+    func composedPrompt() -> String {
+        var lines: [String] = []
+
+        if !style.isEmpty {
+            lines.append("Voice style: \(style)")
+        }
+        if !accent.isEmpty {
+            lines.append("Accent: \(accent)")
+        }
+        if !tone.isEmpty {
+            lines.append("Tone: \(tone)")
+        }
+        if !intonation.isEmpty {
+            lines.append("Intonation: \(intonation)")
+        }
+        if !pace.isEmpty {
+            lines.append("Pace: \(pace)")
+        }
+        if !customInstructions.isEmpty {
+            lines.append(customInstructions)
+        }
+
+        return lines.joined(separator: "\n")
     }
 }
 

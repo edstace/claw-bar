@@ -34,12 +34,6 @@
     <true/>
     <key>SentryDSN</key>
     <string></string>
-    <key>SUEnableAutomaticChecks</key>
-    <true/>
-    <key>SUFeedURL</key>
-    <string>https://edstace.github.io/claw-bar/appcast.xml</string>
-    <key>SUScheduledCheckInterval</key>
-    <integer>86400</integer>
     <key>NSMicrophoneUsageDescription</key>
     <string>ClawBar needs microphone access to capture speech for transcription.</string>
 </dict>

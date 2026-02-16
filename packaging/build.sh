@@ -33,8 +33,8 @@ if [ -d "Sources/ClawBarApp/Resources" ]; then
   cp -R "Sources/ClawBarApp/Resources/." "${APP_DIR}/Contents/Resources/"
 fi
 
-# Copy runtime frameworks (Sparkle, Sentry) when present.
-for framework in Sparkle.framework Sentry.framework; do
+# Copy runtime frameworks when present.
+for framework in Sentry.framework; do
   if [ -d "${BUILD_DIR}/${framework}" ]; then
     cp -R "${BUILD_DIR}/${framework}" "${APP_DIR}/Contents/Frameworks/"
   fi
