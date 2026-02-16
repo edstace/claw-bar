@@ -782,6 +782,12 @@ struct ClawBarView: View {
                                     }
                                 }
 
+                                if let updateError = model.updateCheckErrorMessage, !updateError.isEmpty {
+                                    Text(updateError)
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                }
+
                                 if !model.updateReleaseNotes.isEmpty {
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text("Release Notes")

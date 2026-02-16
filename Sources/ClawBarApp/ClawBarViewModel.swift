@@ -53,6 +53,7 @@ public final class ClawBarViewModel: ObservableObject {
     @Published var availableUpdateURL: URL?
     @Published var availableUpdateChecksumURL: URL?
     @Published var updateReleaseNotes: String = ""
+    @Published var updateCheckErrorMessage: String?
     @Published var skippedUpdateVersion: String?
     @Published var isDownloadingUpdate: Bool = false
     @Published var lastUpdateCheckAt: Date?
@@ -208,6 +209,7 @@ public final class ClawBarViewModel: ObservableObject {
     func checkForUpdates(userInitiated: Bool) async {
         guard !isCheckingForUpdates else { return }
         isCheckingForUpdates = true
+        updateCheckErrorMessage = nil
         defer {
             isCheckingForUpdates = false
         }
@@ -237,13 +239,15 @@ public final class ClawBarViewModel: ObservableObject {
                 availableUpdateURL = nil
                 availableUpdateChecksumURL = nil
                 updateReleaseNotes = ""
+                updateCheckErrorMessage = nil
                 if userInitiated {
                     statusMessage = "ClawBar is up to date"
                 }
             }
         } catch {
             if userInitiated {
-                showError(title: "Update Check Failed", message: error.localizedDescription)
+                updateCheckErrorMessage = "Update check failed: \(error.localizedDescription)"
+                statusMessage = "Update check failed"
             } else {
                 appendRecentError("Update check: \(error.localizedDescription)")
             }
