@@ -1,5 +1,7 @@
 # ClawBar
 
+![ClawBar Logo](Sources/ClawBarApp/Resources/ClawBarAppIcon.svg)
+
 ClawBar is a macOS menu bar app that lets you talk to OpenClaw using your voice.
 
 It records audio, turns speech into text with OpenAI, sends that text (and optional file attachments) to OpenClaw, then can read the reply back out loud.
@@ -167,4 +169,4 @@ If releases are private, unauthenticated clients cannot read `releases/latest` f
 
 ## License
 
-Add your preferred license here.
+MIT. See `/LICENSE`.
