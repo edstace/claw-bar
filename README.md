@@ -79,6 +79,11 @@ export NOTARY_PROFILE="clawbar-notary"
 
 This produces a signed/notarized DMG at `release/ClawBar.dmg`.
 
+### GitHub Release automation
+
+Pushing a `v*` tag (for example `v0.1.0`) triggers
+`.github/workflows/release.yml`, which builds/signs/notarizes and publishes a GitHub Release with the DMG attachment.
+
 ## Project Structure
 
 - `Sources/VoiceBridgeApp/` app source
