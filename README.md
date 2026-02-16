@@ -58,10 +58,6 @@ On first run:
 ./scripts/run_checks.sh
 ```
 
-### PR CI
-
-Pull requests to `main` run `.github/workflows/ci.yml` (checks + release build compile) without signing/notarization.
-
 ### Install locally
 
 ```bash
@@ -70,30 +66,9 @@ ditto dist/ClawBar.app /Applications/ClawBar.app
 
 ## Release (Developer ID + Notarization)
 
-See [`packaging/RELEASE.md`](packaging/RELEASE.md).
+End users should download from [GitHub Releases](https://github.com/edstace/claw-bar/releases).
 
-Typical flow:
-
-```bash
-./scripts/run_checks.sh
-export DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
-export NOTARY_PROFILE="clawbar-notary"
-./packaging/release.sh
-```
-
-This produces a signed/notarized DMG at `release/ClawBar.dmg`.
-
-### GitHub Release automation
-
-Pushing a `v*` tag (for example `v0.1.0`) triggers
-`.github/workflows/release.yml`, which builds/signs/notarizes and publishes a GitHub Release with the DMG attachment.
-
-Example:
-
-```bash
-git tag -a v0.1.6 -m "v0.1.6"
-git push origin v0.1.6
-```
+Maintainers: release signing/notarization and automation details are documented in [`packaging/RELEASE.md`](packaging/RELEASE.md).
 
 ## Project Structure
 
