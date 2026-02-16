@@ -10,6 +10,13 @@ APP_NAME="ClawBar"
 APP_PATH="dist/${APP_NAME}.app"
 RELEASE_DIR="release"
 DMG_PATH="${RELEASE_DIR}/${APP_NAME}.dmg"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/${APP_NAME}-release.XXXXXX")"
+WORK_APP_PATH="${WORK_DIR}/${APP_NAME}.app"
+
+cleanup() {
+  rm -rf "${WORK_DIR}"
+}
+trap cleanup EXIT
 
 DEVELOPER_ID_APP="${DEVELOPER_ID_APP:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
@@ -28,21 +35,33 @@ echo "==> Building app bundle"
 mkdir -p "${RELEASE_DIR}"
 rm -f "${DMG_PATH}"
 
+echo "==> Staging app bundle outside iCloud-managed paths"
+cp -R "${APP_PATH}" "${WORK_APP_PATH}"
+
+echo "==> Sanitizing staged app bundle metadata"
+xattr -cr "${WORK_APP_PATH}" || true
+find "${WORK_APP_PATH}" -name ".DS_Store" -delete || true
+
 echo "==> Signing app with Developer ID"
 codesign --force --sign "${DEVELOPER_ID_APP}" \
   --options runtime --timestamp \
   --entitlements "Sources/VoiceBridgeApp/VoiceBridge.entitlements" \
-  "${APP_PATH}"
+  "${WORK_APP_PATH}"
 
 echo "==> Verifying signature"
-codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
-spctl --assess --type execute --verbose=2 "${APP_PATH}" || true
-
-echo "==> Stapling app ticket"
-xcrun stapler staple "${APP_PATH}"
+codesign --verify --deep --strict --verbose=2 "${WORK_APP_PATH}"
+spctl --assess --type execute --verbose=2 "${WORK_APP_PATH}" || true
 
 echo "==> Creating distributable DMG"
-"$(dirname "$0")/make-dmg.sh"
+APP_PATH="${WORK_APP_PATH}" RELEASE_DIR="${RELEASE_DIR}" DMG_PATH="${DMG_PATH}" "$(dirname "$0")/make-dmg.sh"
+
+echo "==> Signing DMG container with Developer ID"
+codesign --force --sign "${DEVELOPER_ID_APP}" \
+  --timestamp \
+  "${DMG_PATH}"
+
+echo "==> Verifying DMG signature"
+codesign --verify --verbose=2 "${DMG_PATH}"
 
 if [[ -n "${NOTARY_PROFILE}" ]]; then
   echo "==> Submitting to notarization with notarytool profile '${NOTARY_PROFILE}'"
@@ -64,8 +83,8 @@ echo "==> Stapling DMG ticket"
 xcrun stapler staple "${DMG_PATH}"
 
 echo "==> Final Gatekeeper assessment"
-spctl --assess --type execute --verbose=4 "${APP_PATH}" || true
-spctl --assess --type open --verbose=4 "${DMG_PATH}" || true
+spctl --assess --type execute --verbose=4 "${WORK_APP_PATH}" || true
+spctl -a -t open --context context:primary-signature -v "${DMG_PATH}" || true
 
-echo "==> Release ready: ${APP_PATH}"
+echo "==> Release ready (staged app): ${WORK_APP_PATH}"
 echo "==> Distributable DMG: ${DMG_PATH}"

@@ -29,8 +29,8 @@ export APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"
 ```
 
 ## 3. Output
-- Signed, stapled app: `dist/ClawBar.app`
-- Signed, stapled installer DMG: `release/ClawBar.dmg`
+- Signed app: `dist/ClawBar.app`
+- Signed, notarized, stapled installer DMG: `release/ClawBar.dmg`
 
 ## Notes
 - `packaging/build.sh` remains the local ad-hoc build path for development.

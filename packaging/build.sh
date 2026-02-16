@@ -29,6 +29,10 @@ if [ -d "Sources/VoiceBridgeApp/Resources" ]; then
   cp -R "Sources/VoiceBridgeApp/Resources/." "${APP_DIR}/Contents/Resources/"
 fi
 
+# Remove Finder/iCloud metadata xattrs that break strict codesign verification.
+xattr -cr "${APP_DIR}" || true
+find "${APP_DIR}" -name ".DS_Store" -delete || true
+
 # Sign with entitlements (ad-hoc for local use)
 echo "==> Signing (ad-hoc)…"
 codesign --force --sign - \
