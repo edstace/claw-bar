@@ -32,7 +32,7 @@ ClawBar is a macOS menu bar app that bridges microphone/text input to OpenAI spe
 ### Developers (local build)
 
 ```bash
-cd /Users/eric/.openclaw/workspace-builder
+cd /Users/eric/Documents/GitHub/claw-bar
 ./packaging/build.sh
 ditto dist/ClawBar.app /Applications/ClawBar.app
 open -a /Applications/ClawBar.app
@@ -57,6 +57,10 @@ On first run:
 ```bash
 ./scripts/run_checks.sh
 ```
+
+### PR CI
+
+Pull requests to `main` run `.github/workflows/ci.yml` (checks + release build compile) without signing/notarization.
 
 ### Install locally
 
@@ -83,6 +87,13 @@ This produces a signed/notarized DMG at `release/ClawBar.dmg`.
 
 Pushing a `v*` tag (for example `v0.1.0`) triggers
 `.github/workflows/release.yml`, which builds/signs/notarizes and publishes a GitHub Release with the DMG attachment.
+
+Example:
+
+```bash
+git tag -a v0.1.6 -m "v0.1.6"
+git push origin v0.1.6
+```
 
 ## Project Structure
 
