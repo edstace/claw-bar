@@ -88,3 +88,7 @@ jobs:
             release/ClawBar.dmg
             release/ClawBar.dmg.sha256
           generate_release_notes: true
+          body: |
+            First launch note:
+            macOS may prompt once for access to keychain item `com.openclaw.voicebridge`.
+            This is expected when reading your saved API key from Keychain. Choose `Always Allow`.

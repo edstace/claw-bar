@@ -32,6 +32,7 @@ public final class VoiceBridgeViewModel: ObservableObject {
     @Published var isCheckingSetup: Bool = false
     @Published var recentErrors: [String] = []
     @Published var setupBanner: String?
+    @Published var keychainStartupIssue: String?
     @Published var launchAtLoginEnabled: Bool = false
     @Published var isUpdatingLaunchAtLogin: Bool = false
     @Published var sttPreset: STTSensitivityPreset = .normal
@@ -64,11 +65,17 @@ public final class VoiceBridgeViewModel: ObservableObject {
 
     init() {
         // Load saved API key from Keychain
-        if let saved = KeychainManager.load() {
-            let trimmed = saved.trimmingCharacters(in: .whitespacesAndNewlines)
-            apiKey = trimmed
-            lastSavedAPIKey = trimmed
-            hasSavedAPIKey = !trimmed.isEmpty
+        do {
+            if let saved = try KeychainManager.load() {
+                let trimmed = saved.trimmingCharacters(in: .whitespacesAndNewlines)
+                apiKey = trimmed
+                lastSavedAPIKey = trimmed
+                hasSavedAPIKey = !trimmed.isEmpty
+            }
+        } catch {
+            keychainStartupIssue = error.localizedDescription
+            statusMessage = "Keychain access needs approval"
+            appendRecentError("Keychain startup access: \(error.localizedDescription)")
         }
         loadVoiceSettings()
         loadSpeechDetectionSettings()
@@ -93,6 +100,7 @@ public final class VoiceBridgeViewModel: ObservableObject {
             try KeychainManager.save(apiKey: trimmed)
             lastSavedAPIKey = trimmed
             hasSavedAPIKey = true
+            keychainStartupIssue = nil
             statusMessage = "API key saved to Keychain ✓"
         } catch {
             showError(title: "Keychain Error", message: error.localizedDescription)
@@ -116,6 +124,7 @@ public final class VoiceBridgeViewModel: ObservableObject {
                 try KeychainManager.save(apiKey: latest)
                 lastSavedAPIKey = latest
                 hasSavedAPIKey = true
+                keychainStartupIssue = nil
                 statusMessage = "API key auto-saved to Keychain ✓"
             } catch {
                 statusMessage = "API key auto-save failed"
@@ -139,10 +148,16 @@ public final class VoiceBridgeViewModel: ObservableObject {
             apiKey = ""
             lastSavedAPIKey = ""
             hasSavedAPIKey = false
+            keychainStartupIssue = nil
             statusMessage = "API key removed from Keychain"
         } catch {
             showError(title: "Keychain Error", message: error.localizedDescription)
         }
+    }
+
+    func openKeychainAccess() {
+        let keychainURL = URL(fileURLWithPath: "/System/Applications/Utilities/Keychain Access.app")
+        NSWorkspace.shared.openApplication(at: keychainURL, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
     }
 
     // MARK: - Voice Settings
@@ -305,13 +320,20 @@ public final class VoiceBridgeViewModel: ObservableObject {
         let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasValidKey = trimmedKey.hasPrefix("sk-") && trimmedKey.count > 20
         let apiKeyLevel = Self.apiKeySetupLevel(apiKey: trimmedKey)
+        let keyDetail: String
+        if let keychainIssue = keychainStartupIssue {
+            keyDetail = "Keychain access blocked: \(keychainIssue)"
+        } else {
+            keyDetail = hasValidKey ? "Stored in Keychain." : (trimmedKey.isEmpty ? "No key stored in Keychain." : "Key looks invalid (must start with sk-).")
+        }
+        let keyHint = keychainStartupIssue == nil ? "Open Settings and save a valid OpenAI API key." : "Allow ClawBar to access com.openclaw.voicebridge in Keychain Access, then reopen ClawBar."
         checks.append(
             SetupCheck(
                 key: "api_key",
                 title: "OpenAI API Key",
-                level: apiKeyLevel,
-                detail: hasValidKey ? "Stored in Keychain." : (trimmedKey.isEmpty ? "No key stored in Keychain." : "Key looks invalid (must start with sk-)."),
-                hint: "Open Settings and save a valid OpenAI API key."
+                level: keychainStartupIssue == nil ? apiKeyLevel : .warning,
+                detail: keyDetail,
+                hint: keyHint
             )
         )
 
@@ -768,6 +790,10 @@ public final class VoiceBridgeViewModel: ObservableObject {
     }
 
     private func applyStartupSelfHealBanner(from checks: [SetupCheck]) {
+        if keychainStartupIssue != nil {
+            setupBanner = "Keychain access blocked. Click Open Keychain to grant ClawBar access."
+            return
+        }
         if let blocker = checks.first(where: { $0.level == .error }) {
             setupBanner = "Setup needed: \(blocker.title)"
             return

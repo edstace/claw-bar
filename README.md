@@ -119,6 +119,10 @@ In Settings → `Voice` → `Speech Detection`:
 
 After replacing icon assets, restart Dock/Finder or log out/in to refresh icon caches.
 
+### First launch asks for Keychain password
+
+ClawBar stores and reads your API key from Keychain item `com.openclaw.voicebridge`. On first launch after install/update, macOS may prompt to allow access. Choose `Always Allow` to avoid repeated prompts.
+
 ## License
 
 Add your preferred license here.

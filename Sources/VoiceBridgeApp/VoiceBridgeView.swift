@@ -124,9 +124,13 @@ struct VoiceBridgeView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Fix") {
-                        replacementKey = ""
-                        showingSettings = true
+                    Button(model.keychainStartupIssue == nil ? "Fix" : "Open Keychain") {
+                        if model.keychainStartupIssue == nil {
+                            replacementKey = ""
+                            showingSettings = true
+                        } else {
+                            model.openKeychainAccess()
+                        }
                     }
                     .buttonStyle(.borderless)
                     .font(.caption.weight(.semibold))

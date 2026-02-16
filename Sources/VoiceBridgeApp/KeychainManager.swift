@@ -31,7 +31,7 @@ enum KeychainManager {
         }
     }
 
-    static func load() -> String? {
+    static func load() throws -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -41,8 +41,11 @@ enum KeychainManager {
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else {
+        if status == errSecItemNotFound {
             return nil
+        }
+        guard status == errSecSuccess, let data = item as? Data else {
+            throw KeychainError.unhandledError(status: status)
         }
         return String(data: data, encoding: .utf8)
     }
@@ -68,7 +71,16 @@ enum KeychainManager {
             case .encodingFailed:
                 return "Failed to encode API key"
             case .unhandledError(let status):
-                return "Keychain error: \(status)"
+                switch status {
+                case errSecInteractionNotAllowed:
+                    return "Keychain access was blocked. Approve ClawBar access in the keychain prompt or Keychain Access."
+                case errSecAuthFailed:
+                    return "Keychain authentication failed. Enter your login keychain password to grant access."
+                case errSecUserCanceled:
+                    return "Keychain access was canceled."
+                default:
+                    return "Keychain error: \(status)"
+                }
             }
         }
     }
