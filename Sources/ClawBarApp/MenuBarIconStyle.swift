@@ -42,6 +42,6 @@ enum MenuBarIconStyle: String, CaseIterable, Identifiable {
         {
             return style
         }
-        return .paw
+        return .claw
     }
 }

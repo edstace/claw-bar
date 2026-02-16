@@ -14,9 +14,9 @@
   <rect x="96" y="96" width="832" height="832" rx="196" fill="url(#bg)"/>
   <rect x="96" y="96" width="832" height="832" rx="196" fill="url(#gloss)"/>
 
-  <ellipse cx="512" cy="620" rx="185" ry="148" fill="#FFFFFF"/>
-  <circle cx="332" cy="400" r="70" fill="#FFFFFF"/>
-  <circle cx="448" cy="334" r="72" fill="#FFFFFF"/>
-  <circle cx="576" cy="334" r="72" fill="#FFFFFF"/>
-  <circle cx="692" cy="400" r="70" fill="#FFFFFF"/>
+  <path d="M330 746 C404 612 486 460 574 306" fill="none" stroke="#FFFFFF" stroke-width="96" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M558 300 C610 256 670 232 732 228" fill="none" stroke="#FFFFFF" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M504 776 C569 649 644 511 728 372" fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="70" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M716 368 C752 335 792 316 836 310" fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

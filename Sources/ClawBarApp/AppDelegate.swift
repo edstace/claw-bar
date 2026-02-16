@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Hide dock icon — menu-bar-only app
         NSApp.setActivationPolicy(.accessory)
-        UserDefaults.standard.set(MenuBarIconStyle.paw.rawValue, forKey: MenuBarIconStyle.defaultsKey)
+        UserDefaults.standard.set(MenuBarIconStyle.claw.rawValue, forKey: MenuBarIconStyle.defaultsKey)
 
         let view = ClawBarView(model: model)
         let popover = NSPopover()
