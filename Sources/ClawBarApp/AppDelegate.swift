@@ -7,6 +7,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let model = ClawBarViewModel()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !isSecondaryInstance() else {
+            NSApp.terminate(nil)
+            return
+        }
+
         ErrorReporter.configureIfPossible()
         registerLifecycleObservers()
 
@@ -95,5 +100,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func handleSessionDidBecomeActive(_ notification: Notification) {
         model.handleLifecycleResume()
+    }
+
+    private func isSecondaryInstance() -> Bool {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return false }
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        return NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleID)
+            .contains(where: { $0.processIdentifier != currentPID && !$0.isTerminated })
     }
 }
