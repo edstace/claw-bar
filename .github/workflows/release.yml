@@ -18,6 +18,7 @@ jobs:
       APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
       DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
       DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -79,6 +80,13 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" Sources/ClawBarApp/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" Sources/ClawBarApp/Info.plist
+          if [[ -n "${SENTRY_DSN:-}" ]]; then
+            /usr/libexec/PlistBuddy -c "Delete :SentryDSN" Sources/ClawBarApp/Info.plist || true
+            /usr/libexec/PlistBuddy -c "Add :SentryDSN string ${SENTRY_DSN}" Sources/ClawBarApp/Info.plist
+            echo "Injected Sentry DSN into release Info.plist"
+          else
+            echo "SENTRY_DSN secret not set; release will run without Sentry reporting."
+          fi
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Sources/ClawBarApp/Info.plist
           /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Sources/ClawBarApp/Info.plist
 
