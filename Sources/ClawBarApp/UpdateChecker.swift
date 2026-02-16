@@ -19,11 +19,19 @@ enum UpdateChecker {
         request.timeoutInterval = 20
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw ClawBarError.networkError("Update check failed.")
+        guard let http = response as? HTTPURLResponse else {
+            throw ClawBarError.networkError("Update check failed: invalid HTTP response.")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw ClawBarError.networkError(readableStatusMessage(statusCode: http.statusCode, body: data))
         }
 
-        let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+        let release: GitHubRelease
+        do {
+            release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+        } catch {
+            throw ClawBarError.networkError("Update check failed: invalid release payload.")
+        }
         guard !release.draft, !release.prerelease else { return nil }
 
         let latestVersion = normalizedVersion(fromTag: release.tagName)
@@ -76,6 +84,25 @@ enum UpdateChecker {
         }
         return nil
     }
+
+    private static func readableStatusMessage(statusCode: Int, body: Data) -> String {
+        let apiMessage = (try? JSONDecoder().decode(GitHubAPIError.self, from: body))?.message
+        let detailSuffix: String
+        if let apiMessage, !apiMessage.isEmpty {
+            detailSuffix = ": \(apiMessage)"
+        } else {
+            detailSuffix = "."
+        }
+
+        switch statusCode {
+        case 401, 403:
+            return "Update feed is not accessible (HTTP \(statusCode))\(detailSuffix)"
+        case 404:
+            return "Update feed not found (HTTP 404). The releases repo may be private."
+        default:
+            return "Update check failed (HTTP \(statusCode))\(detailSuffix)"
+        }
+    }
 }
 
 private struct GitHubRelease: Decodable {
@@ -104,4 +131,8 @@ private struct GitHubRelease: Decodable {
         case body
         case assets
     }
+}
+
+private struct GitHubAPIError: Decodable {
+    let message: String?
 }

@@ -77,6 +77,8 @@ public final class ClawBarViewModel: ObservableObject {
     private let updateSkippedVersionKey = "clawbar.updates.skippedVersion"
     private let updateRemindAfterKey = "clawbar.updates.remindAfter"
     private let sessionStore = SessionStore()
+    private var lifecyclePauseDepth: Int = 0
+    private var shouldResumeLiveVoiceAfterLifecyclePause: Bool = false
 
     let availableVoices: [String] = [
         "alloy", "ash", "ballad", "cedar", "coral", "echo", "marin", "sage", "shimmer", "verse",
@@ -521,6 +523,67 @@ public final class ClawBarViewModel: ObservableObject {
 
     func quitApp() {
         NSApplication.shared.terminate(nil)
+    }
+
+    func handleLifecyclePause(reason: String) {
+        lifecyclePauseDepth += 1
+        guard lifecyclePauseDepth == 1 else { return }
+
+        shouldResumeLiveVoiceAfterLifecyclePause = isLiveVoiceEnabled
+        liveAutoStopTask?.cancel()
+        liveAutoStopTask = nil
+
+        if isRecording {
+            _ = audioCapture.stopRecording()
+            audioCapture.cleanup()
+            isRecording = false
+        }
+
+        if isSpeaking {
+            audioPlayer?.stop()
+            audioPlayer = nil
+            isSpeaking = false
+        }
+
+        if isLiveVoiceEnabled {
+            isLiveVoiceEnabled = false
+        }
+
+        if composerText == "Listening…" || composerText == "Recording… tap mic to send" {
+            composerText = liveVoiceMode == .pushToTalk ? "Tap mic to talk" : "Live voice paused"
+        }
+        statusMessage = reason
+    }
+
+    func handleLifecycleResume() {
+        guard lifecyclePauseDepth > 0 else { return }
+        lifecyclePauseDepth -= 1
+        guard lifecyclePauseDepth == 0 else { return }
+
+        guard shouldResumeLiveVoiceAfterLifecyclePause else { return }
+        shouldResumeLiveVoiceAfterLifecyclePause = false
+        enableLiveVoice()
+    }
+
+    func handleAppWillTerminate() {
+        liveAutoStopTask?.cancel()
+        liveAutoStopTask = nil
+        autoSaveTask?.cancel()
+        autoSaveTask = nil
+
+        if isRecording {
+            _ = audioCapture.stopRecording()
+            audioCapture.cleanup()
+            isRecording = false
+        }
+
+        if isSpeaking {
+            audioPlayer?.stop()
+            audioPlayer = nil
+            isSpeaking = false
+        }
+
+        persistSession()
     }
 
     func refreshSetupChecks() async {

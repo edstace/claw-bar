@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ErrorReporter.configureIfPossible()
+        registerLifecycleObservers()
 
         // Hide dock icon — menu-bar-only app
         NSApp.setActivationPolicy(.accessory)
@@ -21,5 +22,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusBarController = StatusBarController(popover: popover)
         statusBarController?.start()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        model.handleAppWillTerminate()
+        unregisterLifecycleObservers()
+    }
+
+    private func registerLifecycleObservers() {
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        workspaceCenter.addObserver(
+            self,
+            selector: #selector(handleWorkspaceWillSleep(_:)),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+        workspaceCenter.addObserver(
+            self,
+            selector: #selector(handleWorkspaceDidWake(_:)),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+        workspaceCenter.addObserver(
+            self,
+            selector: #selector(handleScreensDidSleep(_:)),
+            name: NSWorkspace.screensDidSleepNotification,
+            object: nil
+        )
+        workspaceCenter.addObserver(
+            self,
+            selector: #selector(handleScreensDidWake(_:)),
+            name: NSWorkspace.screensDidWakeNotification,
+            object: nil
+        )
+        workspaceCenter.addObserver(
+            self,
+            selector: #selector(handleSessionDidResignActive(_:)),
+            name: NSWorkspace.sessionDidResignActiveNotification,
+            object: nil
+        )
+        workspaceCenter.addObserver(
+            self,
+            selector: #selector(handleSessionDidBecomeActive(_:)),
+            name: NSWorkspace.sessionDidBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    private func unregisterLifecycleObservers() {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    @objc private func handleWorkspaceWillSleep(_ notification: Notification) {
+        model.handleLifecyclePause(reason: "Live voice paused while Mac is sleeping")
+    }
+
+    @objc private func handleWorkspaceDidWake(_ notification: Notification) {
+        model.handleLifecycleResume()
+    }
+
+    @objc private func handleScreensDidSleep(_ notification: Notification) {
+        model.handleLifecyclePause(reason: "Live voice paused while screen is locked")
+    }
+
+    @objc private func handleScreensDidWake(_ notification: Notification) {
+        model.handleLifecycleResume()
+    }
+
+    @objc private func handleSessionDidResignActive(_ notification: Notification) {
+        model.handleLifecyclePause(reason: "Live voice paused while session is inactive")
+    }
+
+    @objc private func handleSessionDidBecomeActive(_ notification: Notification) {
+        model.handleLifecycleResume()
     }
 }
