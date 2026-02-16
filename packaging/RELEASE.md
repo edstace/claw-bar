@@ -5,7 +5,7 @@
 - `Developer ID Application` signing certificate installed in login keychain
 - Xcode Command Line Tools
 
-## 2. Build + sign + notarize
+## 2. Build + sign + notarize + package DMG
 From project root:
 
 ```bash
@@ -30,8 +30,9 @@ export APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"
 
 ## 3. Output
 - Signed, stapled app: `dist/ClawBar.app`
-- Zip submitted to notarization: `release/ClawBar.zip`
+- Signed, stapled installer DMG: `release/ClawBar.dmg`
 
 ## Notes
 - `packaging/build.sh` remains the local ad-hoc build path for development.
-- `packaging/release.sh` is for public distribution artifacts.
+- `packaging/make-dmg.sh` creates a drag-and-drop DMG from an existing app bundle.
+- `packaging/release.sh` is for public distribution artifacts and notarizes the DMG.

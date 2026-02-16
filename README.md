@@ -23,10 +23,18 @@ ClawBar is a macOS menu bar app that bridges microphone/text input to OpenAI spe
 
 ## Quick Start
 
+### End users (recommended)
+
+1. Download the latest `ClawBar.dmg` from Releases.
+2. Open the DMG and drag `ClawBar.app` into `Applications`.
+3. Launch ClawBar from Applications.
+
+### Developers (local build)
+
 ```bash
 cd /Users/eric/.openclaw/workspace-builder
 ./packaging/build.sh
-cp -r dist/ClawBar.app /Applications/
+ditto dist/ClawBar.app /Applications/ClawBar.app
 open -a /Applications/ClawBar.app
 ```
 
@@ -68,6 +76,8 @@ export DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
 export NOTARY_PROFILE="clawbar-notary"
 ./packaging/release.sh
 ```
+
+This produces a signed/notarized DMG at `release/ClawBar.dmg`.
 
 ## Project Structure
 
