@@ -23,52 +23,15 @@ ClawBar is a macOS menu bar app that bridges microphone/text input to OpenAI spe
 
 ## Quick Start
 
-### End users (recommended)
-
 1. Download the latest `ClawBar.dmg` from Releases.
 2. Open the DMG and drag `ClawBar.app` into `Applications`.
 3. Launch ClawBar from Applications.
-
-### Developers (local build)
-
-```bash
-cd /Users/eric/Documents/GitHub/claw-bar
-./packaging/build.sh
-ditto dist/ClawBar.app /Applications/ClawBar.app
-open -a /Applications/ClawBar.app
-```
 
 On first run:
 
 1. Open Settings in the app.
 2. Save your OpenAI API key.
 3. Run `Setup Check` and resolve any warnings/errors.
-
-## Development
-
-### Build
-
-```bash
-./packaging/build.sh
-```
-
-### Run checks
-
-```bash
-./scripts/run_checks.sh
-```
-
-### Install locally
-
-```bash
-ditto dist/ClawBar.app /Applications/ClawBar.app
-```
-
-## Release (Developer ID + Notarization)
-
-End users should download from [GitHub Releases](https://github.com/edstace/claw-bar/releases).
-
-Maintainers: release signing/notarization and automation details are documented in [`packaging/RELEASE.md`](packaging/RELEASE.md).
 
 ## Project Structure
 
