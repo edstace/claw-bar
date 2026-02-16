@@ -116,6 +116,22 @@ struct ClawBarView: View {
             if model.showReliabilityHUD {
                 reliabilityHUD
             }
+            if let version = model.availableUpdateVersion {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(.blue)
+                    Text("Update available: v\(version)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Download") {
+                        model.openAvailableUpdate()
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.caption.weight(.semibold))
+                }
+                .padding(.top, 2)
+            }
             if let banner = model.setupBanner {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -718,6 +734,41 @@ struct ClawBarView: View {
                                 Text(model.isUpdatingLaunchAtLogin ? "Updating launch settings…" : "Automatically starts ClawBar when you sign in.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                            }
+
+                            settingsCard("Updates", systemImage: "arrow.triangle.2.circlepath") {
+                                Text("Current version: \(model.currentVersionDisplay)")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+
+                                if let available = model.availableUpdateVersion {
+                                    Text("New version available: v\(available)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                HStack {
+                                    Button(model.isCheckingForUpdates ? "Checking…" : "Check for Updates") {
+                                        Task { await model.checkForUpdates(userInitiated: true) }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .disabled(model.isCheckingForUpdates)
+
+                                    if model.availableUpdateVersion != nil {
+                                        Button("Download Update") {
+                                            model.openAvailableUpdate()
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                    }
+
+                                    Spacer()
+
+                                    if let checkedAt = model.lastUpdateCheckAt {
+                                        Text("Last checked \(Self.timeFormatter.string(from: checkedAt))")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
 
                             settingsCard("API Key", systemImage: "key.fill") {

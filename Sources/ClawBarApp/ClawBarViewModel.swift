@@ -42,6 +42,10 @@ public final class ClawBarViewModel: ObservableObject {
     @Published var lastTranscribeDurationMs: Int?
     @Published var lastRelayDurationMs: Int?
     @Published var lastRelayRetryCount: Int = 0
+    @Published var isCheckingForUpdates: Bool = false
+    @Published var availableUpdateVersion: String?
+    @Published var availableUpdateURL: URL?
+    @Published var lastUpdateCheckAt: Date?
 
     // MARK: - Private
 
@@ -57,6 +61,7 @@ public final class ClawBarViewModel: ObservableObject {
     private let sttPresetSettingKey = "clawbar.settings.sttPreset"
     private let liveVoiceModeSettingKey = "clawbar.settings.liveVoiceMode"
     private let showReliabilityHUDSettingKey = "clawbar.settings.showReliabilityHUD"
+    private let updateLastCheckedAtKey = "clawbar.updates.lastCheckedAt"
     private let sessionStore = SessionStore()
 
     let availableVoices: [String] = [
@@ -83,6 +88,7 @@ public final class ClawBarViewModel: ObservableObject {
         launchAtLoginEnabled = LaunchAgentManager.isEnabled()
         restoreSession()
         Task { [weak self] in
+            await self?.checkForUpdatesIfDue()
             await self?.refreshSetupChecks()
         }
     }
@@ -158,6 +164,71 @@ public final class ClawBarViewModel: ObservableObject {
     func openKeychainAccess() {
         let keychainURL = URL(fileURLWithPath: "/System/Applications/Utilities/Keychain Access.app")
         NSWorkspace.shared.openApplication(at: keychainURL, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
+    }
+
+    // MARK: - Updates
+
+    var currentVersionDisplay: String {
+        let bundle = Bundle.main
+        let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+        return "\(version) (\(build))"
+    }
+
+    func checkForUpdatesIfDue() async {
+        let defaults = UserDefaults.standard
+        if let last = defaults.object(forKey: updateLastCheckedAtKey) as? Date {
+            let elapsed = Date().timeIntervalSince(last)
+            if elapsed < 60 * 60 * 24 {
+                lastUpdateCheckAt = last
+                return
+            }
+        }
+        await checkForUpdates(userInitiated: false)
+    }
+
+    func checkForUpdates(userInitiated: Bool) async {
+        guard !isCheckingForUpdates else { return }
+        isCheckingForUpdates = true
+        defer {
+            isCheckingForUpdates = false
+        }
+
+        let now = Date()
+        UserDefaults.standard.set(now, forKey: updateLastCheckedAtKey)
+        lastUpdateCheckAt = now
+
+        let bundle = Bundle.main
+        let currentVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+        do {
+            if let update = try await UpdateChecker.check(currentVersion: currentVersion) {
+                availableUpdateVersion = update.version
+                availableUpdateURL = update.downloadURL
+                statusMessage = "Update available: v\(update.version)"
+            } else {
+                availableUpdateVersion = nil
+                availableUpdateURL = nil
+                if userInitiated {
+                    statusMessage = "ClawBar is up to date"
+                }
+            }
+        } catch {
+            if userInitiated {
+                showError(title: "Update Check Failed", message: error.localizedDescription)
+            } else {
+                appendRecentError("Update check: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func openAvailableUpdate() {
+        if let url = availableUpdateURL {
+            NSWorkspace.shared.open(url)
+            return
+        }
+        if let fallback = URL(string: "https://github.com/edstace/claw-bar/releases") {
+            NSWorkspace.shared.open(fallback)
+        }
     }
 
     // MARK: - Voice Settings
