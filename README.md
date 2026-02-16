@@ -36,6 +36,12 @@ On first run:
 2. Save your OpenAI API key.
 3. Open `Diagnostics` and resolve any `Setup Check` warnings/errors.
 
+## Screenshots
+
+![ClawBar Default State](docs/images/clawbar-default-state.png)
+![ClawBar Screenshot 1](docs/images/clawbar-screenshot-1.png)
+![ClawBar Screenshot 2](docs/images/clawbar-screenshot-2.png)
+
 ## How It Works
 
 ClawBar is mainly a coordinator around three jobs:
