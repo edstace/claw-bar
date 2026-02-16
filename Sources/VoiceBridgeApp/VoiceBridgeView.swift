@@ -185,10 +185,12 @@ struct VoiceBridgeView: View {
                     }
                     .coordinateSpace(name: "chat-scroll")
                     .onPreferenceChange(BottomSentinelPreferenceKey.self) { maxY in
-                        let nearBottomNow = maxY <= scrollViewportHeight + 36
-                        isNearBottom = nearBottomNow
-                        if nearBottomNow {
-                            pendingUnread = false
+                        Task { @MainActor in
+                            let nearBottomNow = maxY <= scrollViewportHeight + 36
+                            isNearBottom = nearBottomNow
+                            if nearBottomNow {
+                                pendingUnread = false
+                            }
                         }
                     }
                     .onChange(of: model.chatEntries.count) { _, _ in
