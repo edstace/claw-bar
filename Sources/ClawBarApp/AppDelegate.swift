@@ -48,30 +48,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWorkspace.didWakeNotification,
             object: nil
         )
-        workspaceCenter.addObserver(
-            self,
-            selector: #selector(handleScreensDidSleep(_:)),
-            name: NSWorkspace.screensDidSleepNotification,
-            object: nil
-        )
-        workspaceCenter.addObserver(
-            self,
-            selector: #selector(handleScreensDidWake(_:)),
-            name: NSWorkspace.screensDidWakeNotification,
-            object: nil
-        )
-        workspaceCenter.addObserver(
-            self,
-            selector: #selector(handleSessionDidResignActive(_:)),
-            name: NSWorkspace.sessionDidResignActiveNotification,
-            object: nil
-        )
-        workspaceCenter.addObserver(
-            self,
-            selector: #selector(handleSessionDidBecomeActive(_:)),
-            name: NSWorkspace.sessionDidBecomeActiveNotification,
-            object: nil
-        )
     }
 
     private func unregisterLifecycleObservers() {
@@ -83,22 +59,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func handleWorkspaceDidWake(_ notification: Notification) {
-        model.handleLifecycleResume()
-    }
-
-    @objc private func handleScreensDidSleep(_ notification: Notification) {
-        model.handleLifecyclePause(reason: "Live voice paused while screen is locked")
-    }
-
-    @objc private func handleScreensDidWake(_ notification: Notification) {
-        model.handleLifecycleResume()
-    }
-
-    @objc private func handleSessionDidResignActive(_ notification: Notification) {
-        model.handleLifecyclePause(reason: "Live voice paused while session is inactive")
-    }
-
-    @objc private func handleSessionDidBecomeActive(_ notification: Notification) {
         model.handleLifecycleResume()
     }
 
