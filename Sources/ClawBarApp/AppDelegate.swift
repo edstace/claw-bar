@@ -13,6 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         ErrorReporter.configureIfPossible()
+        if ProcessInfo.processInfo.environment["CLAWBAR_SENTRY_TEST_EVENT"] == "1" {
+            ErrorReporter.capture(message: "ClawBar sentry test event")
+        }
         registerLifecycleObservers()
 
         // Hide dock icon — menu-bar-only app
