@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-sign-notarize-release:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       DEVELOPER_ID_APP: ${{ secrets.DEVELOPER_ID_APP }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -21,6 +21,14 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Validate required secrets
         run: |
