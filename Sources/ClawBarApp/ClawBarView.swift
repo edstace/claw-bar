@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct VoiceBridgeView: View {
-    @ObservedObject var model: VoiceBridgeViewModel
+struct ClawBarView: View {
+    @ObservedObject var model: ClawBarViewModel
     @Environment(\.colorScheme) private var colorScheme
     @State private var showingSettings = false
     @State private var replacementKey = ""
@@ -14,7 +14,7 @@ struct VoiceBridgeView: View {
     @State private var isDropTargeted = false
     @State private var showingQuitConfirmation = false
     @State private var settingsTab: SettingsTab = .general
-    @AppStorage("voicebridge.didShowKeyNudge") private var didShowKeyNudge = false
+    @AppStorage("clawbar.didShowKeyNudge") private var didShowKeyNudge = false
 
     private let bottomAnchorId = "chat-bottom-anchor"
 

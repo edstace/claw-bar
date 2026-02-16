@@ -90,5 +90,5 @@ jobs:
           generate_release_notes: true
           body: |
             First launch note:
-            macOS may prompt once for access to keychain item `com.openclaw.voicebridge`.
+            macOS may prompt once for access to keychain item `com.openclaw.clawbar`.
             This is expected when reading your saved API key from Keychain. Choose `Always Allow`.

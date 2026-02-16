@@ -3,7 +3,7 @@ import Security
 
 /// Stores and retrieves the OpenAI API key in the macOS Keychain.
 enum KeychainManager {
-    private static let service = "com.openclaw.voicebridge"
+    private static let service = "com.openclaw.clawbar"
     private static let account = "openai-api-key"
 
     static func save(apiKey: String) throws {

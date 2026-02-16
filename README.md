@@ -35,7 +35,7 @@ On first run:
 
 ## Project Structure
 
-- `Sources/VoiceBridgeApp/` app source
+- `Sources/ClawBarApp/` app source
 - `packaging/build.sh` local ad-hoc build
 - `packaging/release.sh` signed/notarized release flow
 - `scripts/run_checks.sh` basic regression checks
@@ -70,7 +70,7 @@ After replacing icon assets, restart Dock/Finder or log out/in to refresh icon c
 
 ### First launch asks for Keychain password
 
-ClawBar stores and reads your API key from Keychain item `com.openclaw.voicebridge`. On first launch after install/update, macOS may prompt to allow access. Choose `Always Allow` to avoid repeated prompts.
+ClawBar stores and reads your API key from Keychain item `com.openclaw.clawbar`. On first launch after install/update, macOS may prompt to allow access. Choose `Always Allow` to avoid repeated prompts.
 
 ## License
 

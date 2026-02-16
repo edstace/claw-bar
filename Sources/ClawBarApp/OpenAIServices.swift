@@ -5,7 +5,7 @@ import Foundation
 enum WhisperService {
     static let endpoint = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
     static let minimumAudioDuration: TimeInterval = 0.12
-    static let sensitivityDefaultsKey = "voicebridge.settings.sttSensitivity"
+    static let sensitivityDefaultsKey = "clawbar.settings.sttSensitivity"
 
     /// Transcribe a local audio file to text using Whisper.
     static func transcribe(fileURL: URL, apiKey: String, model: String = "whisper-1") async throws -> String {
@@ -13,16 +13,16 @@ enum WhisperService {
         let signal = try audioSignalStats(fileURL: fileURL, activeSampleThreshold: gate.activeSampleThreshold)
         let duration = signal.duration
         guard duration >= minimumAudioDuration else {
-            throw VoiceBridgeError.audioTooShort(duration: duration, minimumRequired: minimumAudioDuration)
+            throw ClawBarError.audioTooShort(duration: duration, minimumRequired: minimumAudioDuration)
         }
         guard signal.rms >= gate.minimumRMSForSpeech || signal.peak >= gate.minimumPeakForSpeech else {
-            throw VoiceBridgeError.noSpeechDetected
+            throw ClawBarError.noSpeechDetected
         }
         guard signal.activeRatio >= gate.minimumActiveSpeechRatio else {
-            throw VoiceBridgeError.noSpeechDetected
+            throw ClawBarError.noSpeechDetected
         }
 
-        let boundary = "VoiceBridge-\(UUID().uuidString)"
+        let boundary = "ClawBar-\(UUID().uuidString)"
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -58,25 +58,25 @@ enum WhisperService {
         do {
             (data, response) = try await session.data(for: request)
         } catch let urlError as URLError where urlError.code == .timedOut {
-            throw VoiceBridgeError.networkError("Transcription timed out. Check API key/network and try again.")
+            throw ClawBarError.networkError("Transcription timed out. Check API key/network and try again.")
         } catch {
             throw error
         }
 
         guard let http = response as? HTTPURLResponse else {
-            throw VoiceBridgeError.networkError("No HTTP response")
+            throw ClawBarError.networkError("No HTTP response")
         }
         guard (200...299).contains(http.statusCode) else {
             let detail = String(data: data, encoding: .utf8) ?? "unknown"
-            throw VoiceBridgeError.apiError(statusCode: http.statusCode, detail: detail)
+            throw ClawBarError.apiError(statusCode: http.statusCode, detail: detail)
         }
 
         guard let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty else {
-            throw VoiceBridgeError.emptyTranscription
+            throw ClawBarError.emptyTranscription
         }
         if isLikelyInstructionLeak(text) {
-            throw VoiceBridgeError.noSpeechDetected
+            throw ClawBarError.noSpeechDetected
         }
         return text
     }
@@ -222,14 +222,14 @@ enum TTSService {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
-            throw VoiceBridgeError.networkError("No HTTP response")
+            throw ClawBarError.networkError("No HTTP response")
         }
         guard (200...299).contains(http.statusCode) else {
             let detail = String(data: data, encoding: .utf8) ?? "unknown"
-            throw VoiceBridgeError.apiError(statusCode: http.statusCode, detail: detail)
+            throw ClawBarError.apiError(statusCode: http.statusCode, detail: detail)
         }
         guard !data.isEmpty else {
-            throw VoiceBridgeError.emptyAudio
+            throw ClawBarError.emptyAudio
         }
         return data
     }
@@ -246,7 +246,7 @@ enum RealtimeTTSService {
         instructions: String?
     ) async throws -> Data {
         guard let url = URL(string: "wss://api.openai.com/v1/realtime?model=gpt-realtime-mini") else {
-            throw VoiceBridgeError.networkError("Invalid Realtime URL")
+            throw ClawBarError.networkError("Invalid Realtime URL")
         }
 
         var request = URLRequest(url: url)
@@ -322,14 +322,14 @@ enum RealtimeTTSService {
                 completed = true
             case "error":
                 let detail = ((payload["error"] as? [String: Any])?["message"] as? String) ?? "Realtime error"
-                throw VoiceBridgeError.networkError(detail)
+                throw ClawBarError.networkError(detail)
             default:
                 break
             }
         }
 
         guard !audioPCM.isEmpty else {
-            throw VoiceBridgeError.emptyAudio
+            throw ClawBarError.emptyAudio
         }
         return makeWAVFromPCM16(pcmData: audioPCM, sampleRate: 24_000, channels: 1)
     }
@@ -337,7 +337,7 @@ enum RealtimeTTSService {
     private static func sendJSON(_ object: [String: Any], on ws: URLSessionWebSocketTask) async throws {
         let data = try JSONSerialization.data(withJSONObject: object)
         guard let text = String(data: data, encoding: .utf8) else {
-            throw VoiceBridgeError.networkError("Failed to encode Realtime event")
+            throw ClawBarError.networkError("Failed to encode Realtime event")
         }
         try await ws.send(.string(text))
     }
@@ -370,7 +370,7 @@ enum RealtimeTTSService {
 
 // MARK: - Helpers
 
-enum VoiceBridgeError: LocalizedError {
+enum ClawBarError: LocalizedError {
     case networkError(String)
     case apiError(statusCode: Int, detail: String)
     case audioTooShort(duration: TimeInterval, minimumRequired: TimeInterval)

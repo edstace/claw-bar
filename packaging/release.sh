@@ -45,7 +45,7 @@ find "${WORK_APP_PATH}" -name ".DS_Store" -delete || true
 echo "==> Signing app with Developer ID"
 codesign --force --sign "${DEVELOPER_ID_APP}" \
   --options runtime --timestamp \
-  --entitlements "Sources/VoiceBridgeApp/VoiceBridge.entitlements" \
+  --entitlements "Sources/ClawBarApp/ClawBar.entitlements" \
   "${WORK_APP_PATH}"
 
 echo "==> Verifying signature"

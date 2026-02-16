@@ -2,19 +2,19 @@
 import PackageDescription
 
 let package = Package(
-    name: "VoiceBridgeApp",
+    name: "ClawBarApp",
     defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "VoiceBridgeApp", targets: ["VoiceBridgeApp"])
+        .executable(name: "ClawBarApp", targets: ["ClawBarApp"])
     ],
     targets: [
         .executableTarget(
-            name: "VoiceBridgeApp",
-            path: "Sources/VoiceBridgeApp",
-            exclude: ["Info.plist", "VoiceBridge.entitlements", "Resources"]
+            name: "ClawBarApp",
+            path: "Sources/ClawBarApp",
+            exclude: ["Info.plist", "ClawBar.entitlements", "Resources"]
         )
     ]
 )

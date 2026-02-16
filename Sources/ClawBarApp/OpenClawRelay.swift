@@ -17,7 +17,7 @@ public struct OpenClawRelayResult: Sendable {
 @MainActor
 public enum OpenClawRelay {
     private static let relayAgentId = "main"
-    private static var relaySessionId = "voicebridge-relay-v1"
+    private static var relaySessionId = "clawbar-relay-v1"
 
     /// Send a text message to OpenClaw and return the first text reply.
     /// Prefer the CLI bridge because OpenClaw's gateway is not a simple REST endpoint.
@@ -26,7 +26,7 @@ public enum OpenClawRelay {
     }
 
     static func rotateSession() {
-        relaySessionId = "voicebridge-relay-\(UUID().uuidString)"
+        relaySessionId = "clawbar-relay-\(UUID().uuidString)"
     }
 
     private static func sendViaCLI(text: String, attachments: [AttachmentItem]) async throws -> OpenClawRelayResult {
@@ -56,7 +56,7 @@ public enum OpenClawRelay {
                 throw error
             }
         }
-        throw lastError ?? VoiceBridgeError.networkError("OpenClaw relay failed with unknown error.")
+        throw lastError ?? ClawBarError.networkError("OpenClaw relay failed with unknown error.")
     }
 
     private static func buildRelayText(text: String, attachments: [AttachmentItem]) -> String {
@@ -95,13 +95,13 @@ public enum OpenClawRelay {
                 let outputData = stdout.fileHandleForReading.readDataToEndOfFile()
                 let errorData = stderr.fileHandleForReading.readDataToEndOfFile()
                 if state.timedOut {
-                    continuation.resume(throwing: VoiceBridgeError.networkError("OpenClaw CLI timed out after \(Int(timeoutSeconds))s"))
+                    continuation.resume(throwing: ClawBarError.networkError("OpenClaw CLI timed out after \(Int(timeoutSeconds))s"))
                 } else if proc.terminationStatus == 0 {
                     continuation.resume(returning: outputData)
                 } else {
                     let detail = String(data: errorData, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown error"
-                    continuation.resume(throwing: VoiceBridgeError.networkError("OpenClaw CLI failed: \(detail)"))
+                    continuation.resume(throwing: ClawBarError.networkError("OpenClaw CLI failed: \(detail)"))
                 }
             }
 
@@ -119,7 +119,7 @@ public enum OpenClawRelay {
                 defer { state.lock.unlock() }
                 guard !state.resumed else { return }
                 state.resumed = true
-                continuation.resume(throwing: VoiceBridgeError.networkError("Failed to launch OpenClaw CLI at \(executablePath): \(error.localizedDescription)"))
+                continuation.resume(throwing: ClawBarError.networkError("Failed to launch OpenClaw CLI at \(executablePath): \(error.localizedDescription)"))
             }
         }
     }
@@ -191,7 +191,7 @@ public enum OpenClawRelay {
             }
         }
 
-        throw VoiceBridgeError.networkError(
+        throw ClawBarError.networkError(
             "OpenClaw CLI not found. Install `openclaw` or set OPENCLAW_CLI_PATH to its full path."
         )
     }
@@ -203,7 +203,7 @@ public enum OpenClawRelay {
 
         // Some installations may print log lines before JSON.
         guard let jsonData = extractJSONObjectData(from: data) else {
-            throw VoiceBridgeError.networkError("OpenClaw returned non-JSON output.")
+            throw ClawBarError.networkError("OpenClaw returned non-JSON output.")
         }
         return try JSONDecoder().decode(OpenClawAgentResult.self, from: jsonData)
     }

@@ -6,7 +6,7 @@ enum MenuBarIconStyle: String, CaseIterable, Identifiable {
     case wave = "wave"
     case paw = "paw"
 
-    static let defaultsKey = "voicebridge.settings.menuBarIconStyle"
+    static let defaultsKey = "clawbar.settings.menuBarIconStyle"
 
     var id: String { rawValue }
 

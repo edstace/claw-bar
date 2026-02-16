@@ -27,7 +27,7 @@ final class AudioCaptureManager: @unchecked Sendable {
         // Whisper wants 16-kHz mono, but we record at native rate
         // and let the API handle resampling (it accepts up to 25 MB files).
         let tempDir = FileManager.default.temporaryDirectory
-        let url = tempDir.appendingPathComponent("voicebridge-\(UUID().uuidString).wav")
+        let url = tempDir.appendingPathComponent("clawbar-\(UUID().uuidString).wav")
 
         let file = try AVAudioFile(
             forWriting: url,
@@ -39,7 +39,7 @@ final class AudioCaptureManager: @unchecked Sendable {
             do {
                 try file.write(from: buffer)
             } catch {
-                NSLog("VoiceBridge failed to write audio buffer: \(error.localizedDescription)")
+                NSLog("ClawBar failed to write audio buffer: \(error.localizedDescription)")
             }
         }
 

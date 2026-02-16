@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct VoiceBridgeApp: App {
+struct ClawBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {

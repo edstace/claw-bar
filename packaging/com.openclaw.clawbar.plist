@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.openclaw.voicebridge</string>
+    <string>com.openclaw.clawbar</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Applications/ClawBar.app/Contents/MacOS/VoiceBridgeApp</string>
+        <string>/Applications/ClawBar.app/Contents/MacOS/ClawBarApp</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -16,9 +16,9 @@
         <false/>
     </dict>
     <key>StandardOutPath</key>
-    <string>/tmp/voicebridge.stdout.log</string>
+    <string>/tmp/clawbar.stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/voicebridge.stderr.log</string>
+    <string>/tmp/clawbar.stderr.log</string>
     <key>ProcessType</key>
     <string>Interactive</string>
 </dict>

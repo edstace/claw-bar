@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 enum LaunchAgentManager {
-    static let label = "com.openclaw.voicebridge"
+    static let label = "com.openclaw.clawbar"
 
     static func launchAgentPath() -> URL {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -25,7 +25,7 @@ enum LaunchAgentManager {
         _ = runLaunchctl(["bootout", "gui/\(uid)", plistURL.path])
         let bootstrap = runLaunchctl(["bootstrap", "gui/\(uid)", plistURL.path])
         guard bootstrap.exitCode == 0 else {
-            throw VoiceBridgeError.networkError("Failed to enable launch at login: \(bootstrap.stderrText)")
+            throw ClawBarError.networkError("Failed to enable launch at login: \(bootstrap.stderrText)")
         }
         _ = runLaunchctl(["enable", "gui/\(uid)/\(label)"])
     }
@@ -55,12 +55,12 @@ enum LaunchAgentManager {
 
     private static func programPath() -> String {
         let main = Bundle.main.bundleURL
-            .appendingPathComponent("Contents/MacOS/VoiceBridgeApp")
+            .appendingPathComponent("Contents/MacOS/ClawBarApp")
             .path
         if FileManager.default.isExecutableFile(atPath: main) {
             return main
         }
-        return "/Applications/ClawBar.app/Contents/MacOS/VoiceBridgeApp"
+        return "/Applications/ClawBar.app/Contents/MacOS/ClawBarApp"
     }
 
     private static func runLaunchctl(_ args: [String]) -> (exitCode: Int32, stdoutText: String, stderrText: String) {

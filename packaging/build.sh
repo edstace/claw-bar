@@ -4,9 +4,9 @@ set -euo pipefail
 # ClawBar build & package script
 # Produces a proper .app bundle from the SPM executable.
 
-PRODUCT_NAME="VoiceBridgeApp"
+PRODUCT_NAME="ClawBarApp"
 APP_NAME="ClawBar"
-BUNDLE_ID="com.openclaw.voicebridge"
+BUNDLE_ID="com.openclaw.clawbar"
 BUILD_DIR=".build/release"
 APP_DIR="dist/${APP_NAME}.app"
 
@@ -22,11 +22,11 @@ mkdir -p "${APP_DIR}/Contents/Resources"
 cp "${BUILD_DIR}/${PRODUCT_NAME}" "${APP_DIR}/Contents/MacOS/${PRODUCT_NAME}"
 
 # Copy Info.plist
-cp "Sources/VoiceBridgeApp/Info.plist" "${APP_DIR}/Contents/Info.plist"
+cp "Sources/ClawBarApp/Info.plist" "${APP_DIR}/Contents/Info.plist"
 
 # Copy bundled image resources (menu bar template icon, etc.)
-if [ -d "Sources/VoiceBridgeApp/Resources" ]; then
-  cp -R "Sources/VoiceBridgeApp/Resources/." "${APP_DIR}/Contents/Resources/"
+if [ -d "Sources/ClawBarApp/Resources" ]; then
+  cp -R "Sources/ClawBarApp/Resources/." "${APP_DIR}/Contents/Resources/"
 fi
 
 # Remove Finder/iCloud metadata xattrs that break strict codesign verification.
@@ -36,7 +36,7 @@ find "${APP_DIR}" -name ".DS_Store" -delete || true
 # Sign with entitlements (ad-hoc for local use)
 echo "==> Signing (ad-hoc)…"
 codesign --force --sign - \
-  --entitlements "Sources/VoiceBridgeApp/VoiceBridge.entitlements" \
+  --entitlements "Sources/ClawBarApp/ClawBar.entitlements" \
   "${APP_DIR}"
 
 echo "==> Done! App bundle at: ${APP_DIR}"
@@ -45,9 +45,9 @@ echo "To install:"
 echo "  cp -r ${APP_DIR} /Applications/"
 echo ""
 echo "To install LaunchAgent (auto-start at login):"
-echo "  cp packaging/com.openclaw.voicebridge.plist ~/Library/LaunchAgents/"
-echo "  launchctl load ~/Library/LaunchAgents/com.openclaw.voicebridge.plist"
+echo "  cp packaging/com.openclaw.clawbar.plist ~/Library/LaunchAgents/"
+echo "  launchctl load ~/Library/LaunchAgents/com.openclaw.clawbar.plist"
 echo ""
 echo "To uninstall LaunchAgent:"
-echo "  launchctl unload ~/Library/LaunchAgents/com.openclaw.voicebridge.plist"
-echo "  rm ~/Library/LaunchAgents/com.openclaw.voicebridge.plist"
+echo "  launchctl unload ~/Library/LaunchAgents/com.openclaw.clawbar.plist"
+echo "  rm ~/Library/LaunchAgents/com.openclaw.clawbar.plist"

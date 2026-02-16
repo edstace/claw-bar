@@ -6,7 +6,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 @MainActor
-public final class VoiceBridgeViewModel: ObservableObject {
+public final class ClawBarViewModel: ObservableObject {
     // MARK: - Published State
 
     @Published var apiKey: String = ""
@@ -52,11 +52,11 @@ public final class VoiceBridgeViewModel: ObservableObject {
     private var lastSavedAPIKey: String = ""
     private let liveTurnMaxSeconds: Duration = .seconds(6)
     private let voiceProfile = VoiceCallProfile.load()
-    private let voiceSettingKey = "voicebridge.settings.voice"
-    private let stylePromptSettingKey = "voicebridge.settings.stylePrompt"
-    private let sttPresetSettingKey = "voicebridge.settings.sttPreset"
-    private let liveVoiceModeSettingKey = "voicebridge.settings.liveVoiceMode"
-    private let showReliabilityHUDSettingKey = "voicebridge.settings.showReliabilityHUD"
+    private let voiceSettingKey = "clawbar.settings.voice"
+    private let stylePromptSettingKey = "clawbar.settings.stylePrompt"
+    private let sttPresetSettingKey = "clawbar.settings.sttPreset"
+    private let liveVoiceModeSettingKey = "clawbar.settings.liveVoiceMode"
+    private let showReliabilityHUDSettingKey = "clawbar.settings.showReliabilityHUD"
     private let sessionStore = SessionStore()
 
     let availableVoices: [String] = [
@@ -326,7 +326,7 @@ public final class VoiceBridgeViewModel: ObservableObject {
         } else {
             keyDetail = hasValidKey ? "Stored in Keychain." : (trimmedKey.isEmpty ? "No key stored in Keychain." : "Key looks invalid (must start with sk-).")
         }
-        let keyHint = keychainStartupIssue == nil ? "Open Settings and save a valid OpenAI API key." : "Allow ClawBar to access com.openclaw.voicebridge in Keychain Access, then reopen ClawBar."
+        let keyHint = keychainStartupIssue == nil ? "Open Settings and save a valid OpenAI API key." : "Allow ClawBar to access com.openclaw.clawbar in Keychain Access, then reopen ClawBar."
         checks.append(
             SetupCheck(
                 key: "api_key",
@@ -570,11 +570,11 @@ public final class VoiceBridgeViewModel: ObservableObject {
             let text = try await WhisperService.transcribe(fileURL: fileURL, apiKey: trimmedKey)
             lastTranscribeDurationMs = Int(Date().timeIntervalSince(start) * 1000)
             await processUserText(text, prefix: "🎤", attachments: [])
-        } catch VoiceBridgeError.audioTooShort {
+        } catch ClawBarError.audioTooShort {
             statusMessage = isLiveVoiceEnabled ? "Listening…" : "No speech detected"
-        } catch VoiceBridgeError.emptyTranscription {
+        } catch ClawBarError.emptyTranscription {
             statusMessage = isLiveVoiceEnabled ? "Listening…" : "No speech detected"
-        } catch VoiceBridgeError.noSpeechDetected {
+        } catch ClawBarError.noSpeechDetected {
             statusMessage = isLiveVoiceEnabled ? "Listening…" : "No speech detected"
         } catch {
             showError(title: "Transcription Error", message: error.localizedDescription)
@@ -667,7 +667,7 @@ public final class VoiceBridgeViewModel: ObservableObject {
                 fileExtension = "mp3"
             }
 
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("voicebridge-tts-\(UUID().uuidString).\(fileExtension)")
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("clawbar-tts-\(UUID().uuidString).\(fileExtension)")
             try audioData.write(to: tempURL)
             let player = try AVAudioPlayer(contentsOf: tempURL)
             self.audioPlayer = player
