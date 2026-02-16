@@ -17,9 +17,13 @@ echo "==> Creating app bundle…"
 rm -rf "dist"
 mkdir -p "${APP_DIR}/Contents/MacOS"
 mkdir -p "${APP_DIR}/Contents/Resources"
+mkdir -p "${APP_DIR}/Contents/Frameworks"
 
 # Copy binary
 cp "${BUILD_DIR}/${PRODUCT_NAME}" "${APP_DIR}/Contents/MacOS/${PRODUCT_NAME}"
+
+# Ensure embedded frameworks can be resolved at runtime.
+install_name_tool -add_rpath "@executable_path/../Frameworks" "${APP_DIR}/Contents/MacOS/${PRODUCT_NAME}" 2>/dev/null || true
 
 # Copy Info.plist
 cp "Sources/ClawBarApp/Info.plist" "${APP_DIR}/Contents/Info.plist"
@@ -29,6 +33,13 @@ if [ -d "Sources/ClawBarApp/Resources" ]; then
   cp -R "Sources/ClawBarApp/Resources/." "${APP_DIR}/Contents/Resources/"
 fi
 
+# Copy runtime frameworks (Sparkle, Sentry) when present.
+for framework in Sparkle.framework Sentry.framework; do
+  if [ -d "${BUILD_DIR}/${framework}" ]; then
+    cp -R "${BUILD_DIR}/${framework}" "${APP_DIR}/Contents/Frameworks/"
+  fi
+done
+
 # Remove Finder/iCloud metadata xattrs that break strict codesign verification.
 xattr -cr "${APP_DIR}" || true
 find "${APP_DIR}" -name ".DS_Store" -delete || true
@@ -36,6 +47,7 @@ find "${APP_DIR}" -name ".DS_Store" -delete || true
 # Sign with entitlements (ad-hoc for local use)
 echo "==> Signing (ad-hoc)…"
 codesign --force --sign - \
+  --deep \
   --entitlements "Sources/ClawBarApp/ClawBar.entitlements" \
   "${APP_DIR}"
 

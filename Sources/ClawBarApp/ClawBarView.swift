@@ -124,11 +124,12 @@ struct ClawBarView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Download") {
-                        model.openAvailableUpdate()
+                    Button(model.isDownloadingUpdate ? "Downloading…" : "Install") {
+                        model.installAvailableUpdate()
                     }
                     .buttonStyle(.borderless)
                     .font(.caption.weight(.semibold))
+                    .disabled(model.isDownloadingUpdate)
                 }
                 .padding(.top, 2)
             }
@@ -754,11 +755,27 @@ struct ClawBarView: View {
                                     .buttonStyle(.bordered)
                                     .disabled(model.isCheckingForUpdates)
 
-                                    if model.availableUpdateVersion != nil {
-                                        Button("Download Update") {
-                                            model.openAvailableUpdate()
+                                    Button("Check with Sparkle") {
+                                        model.checkViaSparkle()
+                                    }
+                                    .buttonStyle(.bordered)
+
+                                    if model.hasUpdateReady {
+                                        Button(model.isDownloadingUpdate ? "Downloading…" : "Install Update") {
+                                            model.installAvailableUpdate()
                                         }
                                         .buttonStyle(.borderedProminent)
+                                        .disabled(model.isDownloadingUpdate)
+
+                                        Button("Skip Version") {
+                                            model.skipAvailableUpdate()
+                                        }
+                                        .buttonStyle(.bordered)
+
+                                        Button("Remind Tomorrow") {
+                                            model.remindAboutUpdateTomorrow()
+                                        }
+                                        .buttonStyle(.bordered)
                                     }
 
                                     Spacer()
@@ -767,6 +784,23 @@ struct ClawBarView: View {
                                         Text("Last checked \(Self.timeFormatter.string(from: checkedAt))")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
+                                    }
+                                }
+
+                                if !model.updateReleaseNotes.isEmpty {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("Release Notes")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                        ScrollView {
+                                            Text(model.updateReleaseNotes)
+                                                .font(.caption)
+                                                .textSelection(.enabled)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                        .frame(maxHeight: 130)
+                                        .padding(8)
+                                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
                                     }
                                 }
                             }

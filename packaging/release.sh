@@ -44,6 +44,7 @@ find "${WORK_APP_PATH}" -name ".DS_Store" -delete || true
 
 echo "==> Signing app with Developer ID"
 codesign --force --sign "${DEVELOPER_ID_APP}" \
+  --deep \
   --options runtime --timestamp \
   --entitlements "Sources/ClawBarApp/ClawBar.entitlements" \
   "${WORK_APP_PATH}"

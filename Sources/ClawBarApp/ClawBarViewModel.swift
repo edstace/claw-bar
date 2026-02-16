@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import Combine
+import CryptoKit
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
@@ -45,6 +46,10 @@ public final class ClawBarViewModel: ObservableObject {
     @Published var isCheckingForUpdates: Bool = false
     @Published var availableUpdateVersion: String?
     @Published var availableUpdateURL: URL?
+    @Published var availableUpdateChecksumURL: URL?
+    @Published var updateReleaseNotes: String = ""
+    @Published var skippedUpdateVersion: String?
+    @Published var isDownloadingUpdate: Bool = false
     @Published var lastUpdateCheckAt: Date?
 
     // MARK: - Private
@@ -62,7 +67,10 @@ public final class ClawBarViewModel: ObservableObject {
     private let liveVoiceModeSettingKey = "clawbar.settings.liveVoiceMode"
     private let showReliabilityHUDSettingKey = "clawbar.settings.showReliabilityHUD"
     private let updateLastCheckedAtKey = "clawbar.updates.lastCheckedAt"
+    private let updateSkippedVersionKey = "clawbar.updates.skippedVersion"
+    private let updateRemindAfterKey = "clawbar.updates.remindAfter"
     private let sessionStore = SessionStore()
+    private var sparkleCheckAction: (() -> Void)?
 
     let availableVoices: [String] = [
         "alloy", "ash", "ballad", "cedar", "coral", "echo", "marin", "sage", "shimmer", "verse",
@@ -85,6 +93,7 @@ public final class ClawBarViewModel: ObservableObject {
         loadVoiceSettings()
         loadSpeechDetectionSettings()
         loadLiveVoiceSettings()
+        skippedUpdateVersion = UserDefaults.standard.string(forKey: updateSkippedVersionKey)
         launchAtLoginEnabled = LaunchAgentManager.isEnabled()
         restoreSession()
         Task { [weak self] in
@@ -175,6 +184,14 @@ public final class ClawBarViewModel: ObservableObject {
         return "\(version) (\(build))"
     }
 
+    var hasUpdateReady: Bool {
+        availableUpdateVersion != nil
+    }
+
+    func configureSparkleUpdateCheck(_ action: @escaping () -> Void) {
+        sparkleCheckAction = action
+    }
+
     func checkForUpdatesIfDue() async {
         let defaults = UserDefaults.standard
         if let last = defaults.object(forKey: updateLastCheckedAtKey) as? Date {
@@ -202,12 +219,23 @@ public final class ClawBarViewModel: ObservableObject {
         let currentVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
         do {
             if let update = try await UpdateChecker.check(currentVersion: currentVersion) {
+                if !userInitiated, shouldSuppressUpdate(version: update.version) {
+                    availableUpdateVersion = nil
+                    availableUpdateURL = nil
+                    availableUpdateChecksumURL = nil
+                    updateReleaseNotes = ""
+                    return
+                }
                 availableUpdateVersion = update.version
                 availableUpdateURL = update.downloadURL
+                availableUpdateChecksumURL = update.checksumURL
+                updateReleaseNotes = update.releaseNotes
                 statusMessage = "Update available: v\(update.version)"
             } else {
                 availableUpdateVersion = nil
                 availableUpdateURL = nil
+                availableUpdateChecksumURL = nil
+                updateReleaseNotes = ""
                 if userInitiated {
                     statusMessage = "ClawBar is up to date"
                 }
@@ -229,6 +257,83 @@ public final class ClawBarViewModel: ObservableObject {
         if let fallback = URL(string: "https://github.com/edstace/claw-bar/releases") {
             NSWorkspace.shared.open(fallback)
         }
+    }
+
+    func installAvailableUpdate() {
+        guard !isDownloadingUpdate else { return }
+        guard let url = availableUpdateURL else {
+            openAvailableUpdate()
+            return
+        }
+
+        isDownloadingUpdate = true
+        statusMessage = "Downloading update…"
+
+        Task {
+            defer {
+                Task { @MainActor in
+                    self.isDownloadingUpdate = false
+                }
+            }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let checksumURL = availableUpdateChecksumURL {
+                    let (checksumData, _) = try await URLSession.shared.data(from: checksumURL)
+                    let checksumText = String(data: checksumData, encoding: .utf8) ?? ""
+                    guard let expected = UpdateChecker.expectedSHA256(from: checksumText) else {
+                        throw ClawBarError.networkError("Could not parse update checksum.")
+                    }
+                    let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                    guard expected == actual else {
+                        throw ClawBarError.networkError("Update checksum mismatch. Download was not opened.")
+                    }
+                }
+
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("ClawBar-update-\(UUID().uuidString).dmg")
+                try data.write(to: tempURL, options: .atomic)
+                await MainActor.run {
+                    NSWorkspace.shared.open(tempURL)
+                    statusMessage = "Update downloaded. Opened installer DMG."
+                }
+            } catch {
+                await MainActor.run {
+                    showError(title: "Update Install Failed", message: error.localizedDescription)
+                    statusMessage = "Update install failed"
+                }
+            }
+        }
+    }
+
+    func skipAvailableUpdate() {
+        guard let version = availableUpdateVersion else { return }
+        skippedUpdateVersion = version
+        UserDefaults.standard.set(version, forKey: updateSkippedVersionKey)
+        statusMessage = "Skipped update v\(version)"
+    }
+
+    func remindAboutUpdateTomorrow() {
+        let remindAfter = Date().addingTimeInterval(60 * 60 * 24)
+        UserDefaults.standard.set(remindAfter, forKey: updateRemindAfterKey)
+        statusMessage = "Will remind about updates tomorrow"
+        availableUpdateVersion = nil
+        availableUpdateURL = nil
+        availableUpdateChecksumURL = nil
+        updateReleaseNotes = ""
+    }
+
+    func checkViaSparkle() {
+        sparkleCheckAction?()
+    }
+
+    private func shouldSuppressUpdate(version: String) -> Bool {
+        if let skipped = skippedUpdateVersion, skipped == version {
+            return true
+        }
+        if let remindAfter = UserDefaults.standard.object(forKey: updateRemindAfterKey) as? Date,
+           remindAfter > Date() {
+            return true
+        }
+        return false
     }
 
     // MARK: - Voice Settings
@@ -779,12 +884,14 @@ public final class ClawBarViewModel: ObservableObject {
         alertTitle = title
         alertMessage = message
         showErrorAlert = true
+        ErrorReporter.capture(message: "\(title): \(message)")
         appendRecentError("\(title): \(message)")
     }
 
     private func appendRecentError(_ message: String) {
         let ts = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
         recentErrors.append("[\(ts)] \(message)")
+        ErrorReporter.capture(message: message)
         if recentErrors.count > 30 {
             recentErrors.removeFirst(recentErrors.count - 30)
         }

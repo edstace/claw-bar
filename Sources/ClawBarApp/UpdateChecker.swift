@@ -4,6 +4,8 @@ struct UpdateInfo {
     let version: String
     let releasePageURL: URL
     let downloadURL: URL
+    let checksumURL: URL?
+    let releaseNotes: String
 }
 
 enum UpdateChecker {
@@ -28,8 +30,16 @@ enum UpdateChecker {
         guard isNewer(latestVersion, than: currentVersion) else { return nil }
 
         let dmgAsset = release.assets.first { $0.name.lowercased().hasSuffix(".dmg") }
+        let checksumAsset = release.assets.first { $0.name.lowercased().hasSuffix(".dmg.sha256") }
         let downloadURL = dmgAsset?.browserDownloadURL ?? release.htmlURL
-        return UpdateInfo(version: latestVersion, releasePageURL: release.htmlURL, downloadURL: downloadURL)
+        let notes = release.body?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return UpdateInfo(
+            version: latestVersion,
+            releasePageURL: release.htmlURL,
+            downloadURL: downloadURL,
+            checksumURL: checksumAsset?.browserDownloadURL,
+            releaseNotes: notes
+        )
     }
 
     private static func normalizedVersion(fromTag tag: String) -> String {
@@ -56,6 +66,16 @@ enum UpdateChecker {
         let core = value.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: true).first.map(String.init) ?? value
         return core.split(separator: ".").compactMap { Int($0) }
     }
+
+    static func expectedSHA256(from checksumFile: String) -> String? {
+        for line in checksumFile.split(whereSeparator: \.isNewline) {
+            let parts = line.split(whereSeparator: \.isWhitespace)
+            if let first = parts.first, first.count == 64 {
+                return String(first).lowercased()
+            }
+        }
+        return nil
+    }
 }
 
 private struct GitHubRelease: Decodable {
@@ -73,6 +93,7 @@ private struct GitHubRelease: Decodable {
     let htmlURL: URL
     let draft: Bool
     let prerelease: Bool
+    let body: String?
     let assets: [Asset]
 
     enum CodingKeys: String, CodingKey {
@@ -80,6 +101,7 @@ private struct GitHubRelease: Decodable {
         case htmlURL = "html_url"
         case draft
         case prerelease
+        case body
         case assets
     }
 }

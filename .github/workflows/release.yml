@@ -74,6 +74,14 @@ jobs:
       - name: Run checks
         run: ./scripts/run_checks.sh
 
+      - name: Stamp app version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" Sources/ClawBarApp/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" Sources/ClawBarApp/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Sources/ClawBarApp/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Sources/ClawBarApp/Info.plist
+
       - name: Build, sign, notarize, staple
         run: ./packaging/release.sh
 

@@ -1,0 +1,38 @@
+name: Smoke
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  smoke-app-bundle:
+    runs-on: macos-15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Build app bundle
+        run: ./packaging/build.sh
+
+      - name: Verify bundle structure
+        run: |
+          test -d dist/ClawBar.app
+          test -f dist/ClawBar.app/Contents/Info.plist
+          test -x dist/ClawBar.app/Contents/MacOS/ClawBarApp
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" dist/ClawBar.app/Contents/Info.plist
+
+      - name: Launch app bundle executable smoke mode
+        run: |
+          dist/ClawBar.app/Contents/MacOS/ClawBarApp --smoke-test
+
+      - name: Updater API ping
+        run: |
+          curl -fsSL https://api.github.com/repos/edstace/claw-bar/releases/latest > /tmp/latest-release.json
+          rg "\"tag_name\"" /tmp/latest-release.json
