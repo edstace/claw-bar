@@ -97,12 +97,38 @@ jobs:
         run: |
           shasum -a 256 release/ClawBar.dmg > release/ClawBar.dmg.sha256
 
+      - name: Generate release manifest
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+          DMG_PATH="release/ClawBar.dmg"
+          CHECKSUM_PATH="release/ClawBar.dmg.sha256"
+          SHA256="$(awk 'NF {print $1; exit}' "$CHECKSUM_PATH" | tr '[:upper:]' '[:lower:]')"
+          SIZE_BYTES="$(stat -f%z "$DMG_PATH")"
+          RELEASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
+          GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          cat > release/release-manifest.json <<EOF
+          {
+            "tag": "${GITHUB_REF_NAME}",
+            "version": "${VERSION}",
+            "build_number": "${BUILD_NUMBER}",
+            "artifact_name": "ClawBar.dmg",
+            "size_bytes": ${SIZE_BYTES},
+            "sha256": "${SHA256}",
+            "release_url": "${RELEASE_URL}",
+            "commit": "${GITHUB_SHA}",
+            "generated_at": "${GENERATED_AT}"
+          }
+          EOF
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release/ClawBar.dmg
             release/ClawBar.dmg.sha256
+            release/release-manifest.json
           generate_release_notes: true
           body: |
             First launch note:

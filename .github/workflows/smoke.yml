@@ -26,7 +26,16 @@ jobs:
           test -d dist/ClawBar.app
           test -f dist/ClawBar.app/Contents/Info.plist
           test -x dist/ClawBar.app/Contents/MacOS/ClawBarApp
-          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" dist/ClawBar.app/Contents/Info.plist
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" dist/ClawBar.app/Contents/Info.plist)"
+          VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" dist/ClawBar.app/Contents/Info.plist)"
+          BUILD="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" dist/ClawBar.app/Contents/Info.plist)"
+          test "$BUNDLE_ID" = "com.openclaw.clawbar"
+          test -n "$VERSION"
+          test -n "$BUILD"
+
+          codesign --display --entitlements :- dist/ClawBar.app/Contents/MacOS/ClawBarApp > /tmp/clawbar-entitlements.plist
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.device.audio-input" /tmp/clawbar-entitlements.plist
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.network.client" /tmp/clawbar-entitlements.plist
 
       - name: Launch app bundle executable smoke mode
         run: |
