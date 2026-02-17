@@ -21,6 +21,11 @@ let package = Package(
             ],
             path: "Sources/ClawBarApp",
             exclude: ["Info.plist", "ClawBar.entitlements", "Resources"]
-        )
+        ),
+        .testTarget(
+            name: "ClawBarAppTests",
+            dependencies: ["ClawBarApp"],
+            path: "Tests/ClawBarAppTests"
+        ),
     ]
 )

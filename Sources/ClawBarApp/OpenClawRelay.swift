@@ -209,15 +209,69 @@ public enum OpenClawRelay {
     }
 
     public nonisolated static func extractJSONObjectData(from data: Data) -> Data? {
-        guard let raw = String(data: data, encoding: .utf8),
-              let start = raw.firstIndex(of: "{"),
-              let end = raw.lastIndex(of: "}"),
-              start < end
-        else {
+        guard let raw = String(data: data, encoding: .utf8) else {
             return nil
         }
-        let jsonSlice = raw[start...end]
-        return jsonSlice.data(using: .utf8)
+
+        var cursor = raw.startIndex
+        while cursor < raw.endIndex {
+            guard raw[cursor] == "{" else {
+                cursor = raw.index(after: cursor)
+                continue
+            }
+
+            if let end = matchingBraceEnd(in: raw, from: cursor) {
+                let jsonSlice = raw[cursor...end]
+                if let jsonData = jsonSlice.data(using: .utf8),
+                   let object = try? JSONSerialization.jsonObject(with: jsonData),
+                   object is [String: Any] {
+                    return jsonData
+                }
+            }
+            cursor = raw.index(after: cursor)
+        }
+        return nil
+    }
+
+    private nonisolated static func matchingBraceEnd(in text: String, from start: String.Index) -> String.Index? {
+        var depth = 0
+        var inString = false
+        var isEscaped = false
+
+        var index = start
+        while index < text.endIndex {
+            let ch = text[index]
+
+            if inString {
+                if isEscaped {
+                    isEscaped = false
+                } else if ch == "\\" {
+                    isEscaped = true
+                } else if ch == "\"" {
+                    inString = false
+                }
+                index = text.index(after: index)
+                continue
+            }
+
+            if ch == "\"" {
+                inString = true
+            } else if ch == "{" {
+                depth += 1
+            } else if ch == "}" {
+                depth -= 1
+                if depth == 0 {
+                    return index
+                }
+                if depth < 0 {
+                    return nil
+                }
+            }
+
+            index = text.index(after: index)
+        }
+
+        return nil
     }
 
     /// Quick health check — is OpenClaw gateway reachable? (best-effort)

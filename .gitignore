@@ -9,6 +9,8 @@ DerivedData/
 
 # Local runtime/build artifacts
 /dist/
+/release/*.dmg
+/release/*.dmg.sha256
 /memory/
 /.openclaw/
 

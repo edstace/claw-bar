@@ -10,6 +10,19 @@ struct UpdateInfo {
 
 enum UpdateChecker {
     private static let latestReleaseURL = URL(string: "https://api.github.com/repos/edstace/claw-bar/releases/latest")!
+    private static let acceptedDMGContentTypes: Set<String> = [
+        "application/x-apple-diskimage",
+        "application/octet-stream",
+    ]
+    private static let acceptedChecksumContentTypes: Set<String> = [
+        "text/plain",
+        "application/octet-stream",
+    ]
+
+    enum DownloadKind {
+        case dmg
+        case checksum
+    }
 
     static func check(currentVersion: String) async throws -> UpdateInfo? {
         var request = URLRequest(url: latestReleaseURL)
@@ -83,6 +96,34 @@ enum UpdateChecker {
             }
         }
         return nil
+    }
+
+    static func validateBinaryDownloadResponse(_ response: URLResponse, data: Data, expectedKind: DownloadKind) throws {
+        guard let http = response as? HTTPURLResponse else {
+            throw ClawBarError.networkError("Update download failed: invalid HTTP response.")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw ClawBarError.networkError(readableStatusMessage(statusCode: http.statusCode, body: data))
+        }
+        guard !data.isEmpty else {
+            throw ClawBarError.networkError("Update download failed: empty response body.")
+        }
+
+        let acceptedContentTypes: Set<String> = switch expectedKind {
+        case .dmg: acceptedDMGContentTypes
+        case .checksum: acceptedChecksumContentTypes
+        }
+        guard let header = http.value(forHTTPHeaderField: "Content-Type"), !header.isEmpty else {
+            return
+        }
+
+        let mimeType = header.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: true)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
+        guard acceptedContentTypes.contains(mimeType) else {
+            throw ClawBarError.networkError("Update download failed: unexpected content type '\(mimeType)'.")
+        }
     }
 
     private static func readableStatusMessage(statusCode: Int, body: Data) -> String {
