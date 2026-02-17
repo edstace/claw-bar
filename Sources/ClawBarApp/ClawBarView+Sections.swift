@@ -251,6 +251,7 @@ extension ClawBarView {
                 ChatComposerTextView(
                     text: $model.composerText,
                     isEditable: !model.isLiveVoiceEnabled,
+                    colorScheme: colorScheme,
                     onSend: model.sendComposerText,
                     onToggleLiveVoice: model.toggleLiveVoice
                 )

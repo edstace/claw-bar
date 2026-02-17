@@ -18,6 +18,7 @@ public struct OpenClawRelayResult: Sendable {
 public enum OpenClawRelay {
     private static let relayAgentId = "main"
     private static var relaySessionId = "clawbar-relay-v1"
+    private static var cachedExecutablePath: String?
 
     /// Send a text message to OpenClaw and return the first text reply.
     /// Prefer the CLI bridge because OpenClaw's gateway is not a simple REST endpoint.
@@ -173,27 +174,70 @@ public enum OpenClawRelay {
         candidates.append(contentsOf: [
             "\(home)/.n/bin/openclaw",
             "\(home)/.local/bin/openclaw",
+            "\(home)/.npm-global/bin/openclaw",
+            "\(home)/.yarn/bin/openclaw",
+            "\(home)/Library/pnpm/openclaw",
+            "\(home)/bin/openclaw",
             "/opt/homebrew/bin/openclaw",
+            "/opt/homebrew/sbin/openclaw",
             "/usr/local/bin/openclaw",
+            "/usr/local/sbin/openclaw",
             "/usr/bin/openclaw",
+            "/bin/openclaw",
         ])
         return candidates
     }
 
     private static func resolveOpenClawExecutablePath() throws -> String {
         let fm = FileManager.default
+        if let cachedExecutablePath, fm.isExecutableFile(atPath: cachedExecutablePath) {
+            return cachedExecutablePath
+        }
+
         let home = NSHomeDirectory()
         let candidates = candidateExecutablePaths(environment: ProcessInfo.processInfo.environment, home: home)
 
         for candidate in candidates {
             if fm.isExecutableFile(atPath: candidate) {
+                cachedExecutablePath = candidate
                 return candidate
             }
         }
 
+        if let shellPath = resolveOpenClawFromLoginShell(), fm.isExecutableFile(atPath: shellPath) {
+            cachedExecutablePath = shellPath
+            return shellPath
+        }
+
         throw ClawBarError.networkError(
-            "OpenClaw CLI not found. Install `openclaw` or set OPENCLAW_CLI_PATH to its full path."
+            """
+            OpenClaw CLI not found.
+            Install with `brew install openclaw`, or set OPENCLAW_CLI_PATH to the full executable path.
+            Checked common paths and login shell resolution (`zsh -lc 'command -v openclaw'`).
+            """
         )
+    }
+
+    private static func resolveOpenClawFromLoginShell() -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-lc", "command -v openclaw 2>/dev/null || true"]
+        process.environment = ProcessInfo.processInfo.environment
+        let stdout = Pipe()
+        process.standardOutput = stdout
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = stdout.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                !output.isEmpty else { return nil }
+            return output
+        } catch {
+            return nil
+        }
     }
 
     public nonisolated static func decodeAgentResult(from data: Data) throws -> OpenClawAgentResult {

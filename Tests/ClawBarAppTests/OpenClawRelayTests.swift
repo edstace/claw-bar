@@ -12,6 +12,8 @@ final class OpenClawRelayTests: XCTestCase {
         XCTAssertEqual(candidates.first, "/custom/openclaw")
         XCTAssertTrue(candidates.contains("/tmp/bin/openclaw"))
         XCTAssertTrue(candidates.contains("/Users/test/.n/bin/openclaw"))
+        XCTAssertTrue(candidates.contains("/Users/test/.npm-global/bin/openclaw"))
+        XCTAssertTrue(candidates.contains("/opt/homebrew/bin/openclaw"))
     }
 
     func testExtractJSONObjectDataReturnsObjectWhenPrefixedLogsExist() {

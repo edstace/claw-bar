@@ -108,6 +108,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 struct ChatComposerTextView: NSViewRepresentable {
     @Binding var text: String
     var isEditable: Bool
+    var colorScheme: ColorScheme
     var onSend: () -> Void
     var onToggleLiveVoice: () -> Void
 
@@ -129,7 +130,7 @@ struct ChatComposerTextView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.font = NSFont.systemFont(ofSize: 14)
-        textView.textColor = NSColor.labelColor
+        applyAppearance(to: textView)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainerInset = NSSize(width: 10, height: 10)
         textView.onSend = onSend
@@ -147,6 +148,7 @@ struct ChatComposerTextView: NSViewRepresentable {
         if textView.string != text {
             textView.string = text
         }
+        applyAppearance(to: textView)
         textView.onSend = onSend
         textView.onToggleLiveVoice = onToggleLiveVoice
         textView.isEditable = isEditable
@@ -163,6 +165,15 @@ struct ChatComposerTextView: NSViewRepresentable {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
         }
+    }
+
+    private func applyAppearance(to textView: KeyAwareTextView) {
+        let isDark = colorScheme == .dark
+        let textColor = isDark ? NSColor.white : NSColor.black
+        textView.textColor = textColor
+        textView.insertionPointColor = isDark ? NSColor.white : NSColor.black
+        textView.typingAttributes[.foregroundColor] = textColor
+        textView.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
     }
 }
 
