@@ -626,10 +626,6 @@ extension ClawBarViewModel {
         }
         appendChat(role: .user, text: text, attachments: attachments)
         statusMessage = "Transcribed ✓"
-        if isLiveVoiceEnabled {
-            composerText = "You: \(text)"
-        }
-
         if relayToOpenClaw {
             await relayText(text, attachments: attachments)
         } else if isLiveVoiceEnabled {
@@ -650,9 +646,7 @@ extension ClawBarViewModel {
                 appendChat(role: .assistant, text: result.text, attachments: [])
                 latestTranscript = result.text
                 statusMessage = "Relay complete ✓"
-                if isLiveVoiceEnabled {
-                    composerText = "You: \(text)\nOpenClaw: \(result.text)"
-                }
+                composerText = ""
                 if isLiveVoiceEnabled {
                     await speak(text: result.text)
                 }

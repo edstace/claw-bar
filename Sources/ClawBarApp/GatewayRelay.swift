@@ -2,6 +2,13 @@ import Foundation
 
 /// Connects directly to an OpenClaw Gateway WebSocket for chat.send / chat events.
 /// Replaces the CLI subprocess relay when a remote gateway URL is configured.
+///
+/// Protocol (v3):
+///   1. Connect WS → receive connect.challenge event
+///   2. Send type:"req" method:"connect" with auth token, client info, protocol version
+///   3. Receive type:"res" hello-ok
+///   4. Send type:"req" method:"chat.send" with agentId + message
+///   5. Listen for type:"event" event:"chat" until done
 @MainActor
 public enum GatewayRelay {
     // MARK: - Configuration
@@ -50,14 +57,16 @@ public enum GatewayRelay {
         sessionKey = "clawbar-ws-\(UUID().uuidString)"
     }
 
+    // MARK: - Protocol Constants
+
+    private static let protocolVersion = 3
+    private static let clientId = "openclaw-control-ui"
+    private static let clientMode = "webchat"
+    private static let clientVersion = "0.1.0"
+
     // MARK: - Send
 
     /// Send a message to the gateway via WebSocket and wait for the full response.
-    /// Protocol:
-    ///   1. Connect to ws(s)://host:port with auth params
-    ///   2. Send JSON-RPC `chat.send` with message + session
-    ///   3. Listen for `chat` events until we get the complete response
-    ///   4. Return the assistant text
     static func send(text: String, attachments: [AttachmentItem]) async throws -> OpenClawRelayResult {
         let urlString = gatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !urlString.isEmpty else {
@@ -76,45 +85,106 @@ public enum GatewayRelay {
         // Build the message with attachments
         let messageText = buildMessageText(text: text, attachments: attachments)
 
-        // Connect
-        let ws = URLSession.shared.webSocketTask(with: url)
+        // Connect — set Origin header to match gateway host for control UI auth
+        var request = URLRequest(url: url)
+        if let scheme = url.scheme, let host = url.host {
+            let port = url.port.map { ":\($0)" } ?? ""
+            let httpScheme = scheme == "wss" ? "https" : "http"
+            request.setValue("\(httpScheme)://\(host)\(port)", forHTTPHeaderField: "Origin")
+        }
+        let ws = URLSession.shared.webSocketTask(with: request)
         ws.resume()
 
         defer { ws.cancel(with: .goingAway, reason: nil) }
 
-        // Authenticate via connect message
+        // Step 1: Wait for connect.challenge event
+        let challengeMsg = try await receiveJSON(on: ws, timeout: 10)
+        guard let challengeType = challengeMsg["type"] as? String,
+              challengeType == "event",
+              let challengeEvent = challengeMsg["event"] as? String,
+              challengeEvent == "connect.challenge" else {
+            // Some gateways may not send a challenge — proceed anyway
+            // But if we got something else unexpected, log it
+            let desc = String(describing: challengeMsg)
+            throw ClawBarError.networkError("Expected connect.challenge, got: \(desc.prefix(200))")
+        }
+
+        // Step 2: Send connect request
+        let connectId = UUID().uuidString
         let connectPayload: [String: Any] = [
+            "type": "req",
+            "id": connectId,
             "method": "connect",
-            "id": UUID().uuidString,
-            "params": buildConnectParams(token: token),
+            "params": [
+                "minProtocol": protocolVersion,
+                "maxProtocol": protocolVersion,
+                "client": [
+                    "id": clientId,
+                    "version": clientVersion,
+                    "platform": "macos",
+                    "mode": clientMode,
+                ] as [String: Any],
+                "role": "operator",
+                "scopes": ["operator.read", "operator.write"],
+                "caps": [] as [String],
+                "commands": [] as [String],
+                "permissions": [:] as [String: Any],
+                "auth": token.isEmpty ? [:] as [String: Any] : ["token": token] as [String: Any],
+                "locale": "en-US",
+                "userAgent": "clawbar/\(clientVersion)",
+            ] as [String: Any],
         ]
         try await sendJSON(connectPayload, on: ws)
 
-        // Wait for connect ack
+        // Step 3: Wait for connect response (hello-ok)
         let connectResponse = try await receiveJSON(on: ws, timeout: 10)
-        if let error = connectResponse["error"] as? [String: Any],
-           let message = error["message"] as? String {
-            throw ClawBarError.networkError("Gateway auth failed: \(message)")
+        if let ok = connectResponse["ok"] as? Bool, !ok {
+            let errorMsg = (connectResponse["error"] as? [String: Any])?["message"] as? String ?? "Unknown auth error"
+            throw ClawBarError.networkError("Gateway auth failed: \(errorMsg)")
         }
 
-        // Send chat.send
+        // Step 4: Send chat.send
         let chatSendId = UUID().uuidString
         let chatSendPayload: [String: Any] = [
-            "method": "chat.send",
+            "type": "req",
             "id": chatSendId,
+            "method": "chat.send",
             "params": [
-                "agentId": agent,
-                "sessionKey": session,
+                "sessionKey": "agent:\(agent):\(session)",
                 "message": messageText,
+                "idempotencyKey": chatSendId,
             ] as [String: Any],
         ]
         try await sendJSON(chatSendPayload, on: ws)
 
-        // Collect response — listen for chat events until response.done or timeout
+        // Step 5: Wait for chat.send ack to get the runId
+        var runId: String?
+        let ackDeadline = Date().addingTimeInterval(15)
+        while runId == nil && Date() < ackDeadline {
+            guard let msg = try await receiveJSONOptional(on: ws, timeout: 5) else { continue }
+            let msgType = msg["type"] as? String ?? ""
+            if msgType == "res", let id = msg["id"] as? String, id == chatSendId {
+                if let ok = msg["ok"] as? Bool, !ok {
+                    let errMsg = (msg["error"] as? [String: Any])?["message"] as? String ?? "Unknown error"
+                    throw ClawBarError.networkError("chat.send failed: \(errMsg)")
+                }
+                runId = (msg["payload"] as? [String: Any])?["runId"] as? String
+                break
+            }
+        }
+
+        guard let activeRunId = runId else {
+            throw ClawBarError.networkError("No runId received from chat.send")
+        }
+
+        // Step 6: Collect response — listen for chat/agent events matching our runId
+        // Event format:
+        //   chat events: {type:"event", event:"chat", payload:{runId, state:"delta"|"final", message:{content:[{type:"text",text:"..."}]}}}
+        //   agent lifecycle: {type:"event", event:"agent", payload:{runId, stream:"lifecycle", data:{phase:"end"}}}
+        //   agent assistant: {type:"event", event:"agent", payload:{runId, stream:"assistant", data:{text:"...",delta:"..."}}}
         var responseText = ""
         var completed = false
         let timeout: TimeInterval = 120
-
         let deadline = Date().addingTimeInterval(timeout)
 
         while !completed && Date() < deadline {
@@ -122,50 +192,53 @@ public enum GatewayRelay {
                 continue
             }
 
-            // Handle RPC response to chat.send
-            if let id = msg["id"] as? String, id == chatSendId {
-                if let error = msg["error"] as? [String: Any],
-                   let errMsg = error["message"] as? String {
-                    throw ClawBarError.networkError("chat.send failed: \(errMsg)")
-                }
-                // ack received, continue listening for chat events
-                continue
-            }
+            let msgType = msg["type"] as? String ?? ""
 
-            // Handle chat events (streamed response)
-            if let method = msg["method"] as? String, method == "chat" {
-                if let params = msg["params"] as? [String: Any] {
-                    if let text = params["text"] as? String {
-                        responseText = text
-                    }
-                    if let delta = params["delta"] as? String {
-                        responseText += delta
-                    }
-                    if let done = params["done"] as? Bool, done {
-                        completed = true
-                    }
-                    if let status = params["status"] as? String,
-                       status == "complete" || status == "done" || status == "finished" {
-                        completed = true
-                    }
-                }
-            }
+            // Handle events
+            if msgType == "event" {
+                let event = msg["event"] as? String ?? ""
+                let payload = msg["payload"] as? [String: Any] ?? [:]
 
-            // Handle agent events
-            if let method = msg["method"] as? String, method == "agent" {
-                if let params = msg["params"] as? [String: Any] {
-                    if let status = params["status"] as? String,
-                       status == "complete" || status == "done" || status == "finished" {
-                        completed = true
-                    }
-                    // Extract text from agent completion
-                    if let result = params["result"] as? [String: Any],
-                       let payloads = result["payloads"] as? [[String: Any]] {
-                        for payload in payloads {
-                            if let text = payload["text"] as? String, !text.isEmpty {
+                // Only process events for our runId
+                let eventRunId = payload["runId"] as? String ?? ""
+                guard eventRunId == activeRunId else { continue }
+
+                // Chat events — the authoritative source for response text
+                if event == "chat" {
+                    let state = payload["state"] as? String ?? ""
+
+                    // Extract text from message.content array
+                    if let message = payload["message"] as? [String: Any],
+                       let content = message["content"] as? [[String: Any]] {
+                        for item in content {
+                            if let itemType = item["type"] as? String, itemType == "text",
+                               let text = item["text"] as? String {
                                 responseText = text
                             }
                         }
+                    }
+
+                    if state == "final" {
+                        completed = true
+                    }
+                }
+
+                // Agent lifecycle events — backup completion signal
+                if event == "agent" {
+                    let stream = payload["stream"] as? String ?? ""
+
+                    if stream == "lifecycle",
+                       let data = payload["data"] as? [String: Any],
+                       let phase = data["phase"] as? String,
+                       phase == "end" {
+                        completed = true
+                    }
+
+                    // Agent assistant stream — backup text source
+                    if stream == "assistant",
+                       let data = payload["data"] as? [String: Any],
+                       let text = data["text"] as? String, !text.isEmpty {
+                        responseText = text
                     }
                 }
             }
@@ -193,29 +266,53 @@ public enum GatewayRelay {
         let token = gatewayToken.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
-            let ws = URLSession.shared.webSocketTask(with: url)
+            var request = URLRequest(url: url)
+            if let scheme = url.scheme, let host = url.host {
+                let port = url.port.map { ":\($0)" } ?? ""
+                let httpScheme = scheme == "wss" ? "https" : "http"
+                request.setValue("\(httpScheme)://\(host)\(port)", forHTTPHeaderField: "Origin")
+            }
+            let ws = URLSession.shared.webSocketTask(with: request)
             ws.resume()
             defer { ws.cancel(with: .goingAway, reason: nil) }
 
+            // Wait for connect.challenge
+            let challenge = try await receiveJSON(on: ws, timeout: 5)
+            guard (challenge["event"] as? String) == "connect.challenge" else { return false }
+
+            // Send connect
+            let connectId = UUID().uuidString
             let connectPayload: [String: Any] = [
+                "type": "req",
+                "id": connectId,
                 "method": "connect",
-                "id": UUID().uuidString,
-                "params": buildConnectParams(token: token),
+                "params": [
+                    "minProtocol": protocolVersion,
+                    "maxProtocol": protocolVersion,
+                    "client": [
+                        "id": clientId,
+                        "version": clientVersion,
+                        "platform": "macos",
+                        "mode": clientMode,
+                    ] as [String: Any],
+                    "role": "operator",
+                    "scopes": ["operator.read", "operator.write"],
+                    "caps": [] as [String],
+                    "commands": [] as [String],
+                    "permissions": [:] as [String: Any],
+                    "auth": token.isEmpty ? [:] as [String: Any] : ["token": token] as [String: Any],
+                    "locale": "en-US",
+                    "userAgent": "clawbar/\(clientVersion)",
+                ] as [String: Any],
             ]
             try await sendJSON(connectPayload, on: ws)
 
+            // Wait for response
             let response = try await receiveJSON(on: ws, timeout: 5)
-            if response["error"] != nil { return false }
-
-            // Send health check
-            let healthPayload: [String: Any] = [
-                "method": "health",
-                "id": UUID().uuidString,
-                "params": [:] as [String: Any],
-            ]
-            try await sendJSON(healthPayload, on: ws)
-            let healthResponse = try await receiveJSON(on: ws, timeout: 5)
-            return healthResponse["error"] == nil
+            if let ok = response["ok"] as? Bool, ok {
+                return true
+            }
+            return false
         } catch {
             return false
         }
@@ -239,18 +336,6 @@ public enum GatewayRelay {
 
     // MARK: - Helpers
 
-    private static func buildConnectParams(token: String) -> [String: Any] {
-        var params: [String: Any] = [:]
-        var auth: [String: Any] = [:]
-        if !token.isEmpty {
-            auth["token"] = token
-        }
-        if !auth.isEmpty {
-            params["auth"] = auth
-        }
-        return params
-    }
-
     private static func buildMessageText(text: String, attachments: [AttachmentItem]) -> String {
         guard !attachments.isEmpty else { return text }
         var lines: [String] = [text, "", "Attached files:"]
@@ -271,7 +356,6 @@ public enum GatewayRelay {
     }
 
     private static func receiveJSON(on ws: URLSessionWebSocketTask, timeout: TimeInterval) async throws -> [String: Any] {
-        // Receive with a simple timeout via Task.sleep race
         let receiveTask = Task<Data, Error> {
             let message = try await ws.receive()
             switch message {
