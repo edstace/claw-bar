@@ -24,6 +24,31 @@ enum UpdateChecker {
         case checksum
     }
 
+    static func validateDownloadedDMGAuthenticity(at fileURL: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/spctl")
+        process.arguments = ["-a", "-t", "open", "--context", "context:primary-signature", "-v", fileURL.path]
+
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            throw ClawBarError.networkError("Could not verify downloaded installer signature.")
+        }
+
+        let out = String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let err = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        guard process.terminationStatus == 0 else {
+            let detail = (out + "\n" + err).trimmingCharacters(in: .whitespacesAndNewlines)
+            throw ClawBarError.networkError("Installer signature verification failed: \(detail)")
+        }
+    }
+
     static func check(currentVersion: String) async throws -> UpdateInfo? {
         var request = URLRequest(url: latestReleaseURL)
         request.httpMethod = "GET"

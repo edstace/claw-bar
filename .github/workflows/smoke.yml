@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   smoke-app-bundle:
     runs-on: macos-15

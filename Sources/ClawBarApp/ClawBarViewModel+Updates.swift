@@ -128,6 +128,7 @@ extension ClawBarViewModel {
 
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("ClawBar-update-\(UUID().uuidString).dmg")
                 try data.write(to: tempURL, options: .atomic)
+                try UpdateChecker.validateDownloadedDMGAuthenticity(at: tempURL)
                 await MainActor.run {
                     NSWorkspace.shared.open(tempURL)
                     statusMessage = "Update downloaded. Opened installer DMG."
