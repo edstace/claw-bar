@@ -234,6 +234,8 @@ extension ClawBarViewModel {
         liveAutoStopTask = nil
         autoSaveTask?.cancel()
         autoSaveTask = nil
+        apiRateMonitorTask?.cancel()
+        apiRateMonitorTask = nil
 
         if isRecording {
             _ = audioCapture.stopRecording()
@@ -396,6 +398,10 @@ extension ClawBarViewModel {
         statusMessage = "Diagnostics copied"
     }
 
+    func refreshAPIRateSnapshot() async {
+        apiRateSnapshot = await OpenAIAPI.rateMonitor.snapshot()
+    }
+
     func diagnosticsReport() -> String {
         let bundle = Bundle.main
         let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
@@ -411,6 +417,31 @@ extension ClawBarViewModel {
         lines.append("Last Transcribe ms: \(lastTranscribeDurationMs.map(String.init) ?? "n/a")")
         lines.append("Last Relay ms: \(lastRelayDurationMs.map(String.init) ?? "n/a")")
         lines.append("Last Relay retries: \(lastRelayRetryCount)")
+        lines.append("API req/min (60s): \(apiRateSnapshot.requestsLast60Seconds)")
+        lines.append("API req/hour (60m): \(apiRateSnapshot.requestsLast60Minutes)")
+        lines.append("API last status: \(apiRateSnapshot.lastStatusCode.map(String.init) ?? "n/a")")
+        lines.append("API last endpoint: \(apiRateSnapshot.lastEndpoint ?? "n/a")")
+        lines.append("API last 429: \(apiRateSnapshot.last429At.map { ISO8601DateFormatter().string(from: $0) } ?? "n/a")")
+        lines.append(String(format: "API est. cost last request (USD): %.6f", apiRateSnapshot.estimatedCostLastRequestUSD ?? 0))
+        lines.append(String(format: "API est. cost today (USD): %.6f", apiRateSnapshot.estimatedCostTodayUSD))
+        lines.append(String(format: "API est. cost week (USD): %.6f", apiRateSnapshot.estimatedCostWeekUSD))
+        lines.append(String(format: "API est. cost month (USD): %.6f", apiRateSnapshot.estimatedCostMonthUSD))
+        lines.append(
+            String(
+                format: "Cost assumptions: Whisper/min=%.6f, TTS legacy/1M chars=%.3f, TTS HD/1M chars=%.3f, gpt-4o-mini-tts/min=%.6f, chars/min=%.1f",
+                OpenAICostEstimator.whisperUSDPerMinute(),
+                OpenAICostEstimator.ttsLegacyUSDPer1MChars(),
+                OpenAICostEstimator.ttsHDUSDPer1MChars(),
+                OpenAICostEstimator.ttsMiniUSDPerMinute(),
+                OpenAICostEstimator.ttsEstimatedCharsPerMinute()
+            )
+        )
+        if let remaining = apiRateSnapshot.requestRemaining, let limit = apiRateSnapshot.requestLimit {
+            lines.append("API request budget: \(remaining)/\(limit) remaining")
+        }
+        if let remainingTokens = apiRateSnapshot.tokenRemaining, let tokenLimit = apiRateSnapshot.tokenLimit {
+            lines.append("API token budget: \(remainingTokens)/\(tokenLimit) remaining")
+        }
         lines.append("")
         lines.append("Setup Checks:")
         for check in setupChecks {

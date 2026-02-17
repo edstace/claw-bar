@@ -12,6 +12,7 @@ enum WhisperService {
         let gate = currentGate()
         let signal = try audioSignalStats(fileURL: fileURL, activeSampleThreshold: gate.activeSampleThreshold)
         let duration = signal.duration
+        let estimatedCostUSD = OpenAICostEstimator.whisperEstimate(durationSeconds: duration)
         guard duration >= minimumAudioDuration else {
             throw ClawBarError.audioTooShort(duration: duration, minimumRequired: minimumAudioDuration)
         }
@@ -66,6 +67,11 @@ enum WhisperService {
         guard let http = response as? HTTPURLResponse else {
             throw ClawBarError.networkError("No HTTP response")
         }
+        await OpenAIAPI.rateMonitor.record(
+            response: http,
+            endpoint: "audio/transcriptions",
+            estimatedCostUSD: estimatedCostUSD
+        )
         guard (200...299).contains(http.statusCode) else {
             let detail = String(data: data, encoding: .utf8) ?? "unknown"
             throw ClawBarError.apiError(statusCode: http.statusCode, detail: detail)
@@ -218,12 +224,18 @@ enum TTSService {
             "response_format": "mp3",
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let estimatedCostUSD = OpenAICostEstimator.ttsEstimate(characters: text.count, model: model)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
             throw ClawBarError.networkError("No HTTP response")
         }
+        await OpenAIAPI.rateMonitor.record(
+            response: http,
+            endpoint: "audio/speech",
+            estimatedCostUSD: estimatedCostUSD
+        )
         guard (200...299).contains(http.statusCode) else {
             let detail = String(data: data, encoding: .utf8) ?? "unknown"
             throw ClawBarError.apiError(statusCode: http.statusCode, detail: detail)
@@ -415,4 +427,8 @@ private extension FixedWidthInteger {
         var value = self.littleEndian
         return Data(bytes: &value, count: MemoryLayout<Self>.size)
     }
+}
+
+enum OpenAIAPI {
+    static let rateMonitor = OpenAIAPIRateMonitor()
 }

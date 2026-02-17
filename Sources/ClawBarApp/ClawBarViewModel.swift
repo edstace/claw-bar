@@ -57,6 +57,7 @@ public final class ClawBarViewModel: ObservableObject {
     @Published var skippedUpdateVersion: String?
     @Published var isDownloadingUpdate: Bool = false
     @Published var lastUpdateCheckAt: Date?
+    @Published var apiRateSnapshot: OpenAIAPIRateSnapshot = .empty
 
     // MARK: - Private
 
@@ -64,6 +65,7 @@ public final class ClawBarViewModel: ObservableObject {
     var audioPlayer: AVAudioPlayer?
     var autoSaveTask: Task<Void, Never>?
     var liveAutoStopTask: Task<Void, Never>?
+    var apiRateMonitorTask: Task<Void, Never>?
     var lastSavedAPIKey: String = ""
     let liveTurnMaxSeconds: Duration = .seconds(6)
     let voiceProfile = VoiceCallProfile.load()
@@ -107,6 +109,14 @@ public final class ClawBarViewModel: ObservableObject {
         Task { [weak self] in
             await self?.checkForUpdatesIfDue()
             await self?.refreshSetupChecks()
+            await self?.refreshAPIRateSnapshot()
+        }
+        apiRateMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard let self else { continue }
+                await self.refreshAPIRateSnapshot()
+            }
         }
     }
 }

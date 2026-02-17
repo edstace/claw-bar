@@ -355,6 +355,109 @@ extension ClawBarView {
                                     }
                                 }
                             }
+
+                            settingsCard("OpenAI API Rate & Cost", systemImage: "chart.line.uptrend.xyaxis") {
+                                let snapshot = model.apiRateSnapshot
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("Requests (60s / 60m)")
+                                            .font(.callout)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text("\(snapshot.requestsLast60Seconds) / \(snapshot.requestsLast60Minutes)")
+                                            .font(.callout.weight(.semibold))
+                                    }
+
+                                    HStack {
+                                        Text("Last status")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text(snapshot.lastStatusCode.map(String.init) ?? "n/a")
+                                            .font(.caption.weight(.semibold))
+                                    }
+
+                                    HStack {
+                                        Text("Last endpoint")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text(snapshot.lastEndpoint ?? "n/a")
+                                            .font(.caption)
+                                            .lineLimit(1)
+                                    }
+
+                                    HStack {
+                                        Text("Last 429")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text(relativeTime(snapshot.last429At))
+                                            .font(.caption)
+                                    }
+
+                                    Divider()
+
+                                    HStack {
+                                        Text("Estimated Cost (today / week / month)")
+                                            .font(.callout)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text("\(currency(snapshot.estimatedCostTodayUSD)) / \(currency(snapshot.estimatedCostWeekUSD)) / \(currency(snapshot.estimatedCostMonthUSD))")
+                                            .font(.callout.weight(.semibold))
+                                    }
+
+                                    HStack {
+                                        Text("Last request est.")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text(currency(snapshot.estimatedCostLastRequestUSD ?? 0))
+                                            .font(.caption.weight(.semibold))
+                                    }
+
+                                    if let remaining = snapshot.requestRemaining, let limit = snapshot.requestLimit {
+                                        HStack {
+                                            Text("Request budget")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            Spacer()
+                                            Text("\(remaining)/\(limit) remaining")
+                                                .font(.caption)
+                                        }
+                                    }
+
+                                    if let remaining = snapshot.tokenRemaining, let limit = snapshot.tokenLimit {
+                                        HStack {
+                                            Text("Token budget")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            Spacer()
+                                            Text("\(remaining)/\(limit) remaining")
+                                                .font(.caption)
+                                        }
+                                    }
+
+                                    Text("Cost is estimated from model-specific pricing assumptions (Whisper, tts-1/tts-1-hd, gpt-4o-mini-tts).")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+
+                                    HStack {
+                                        Button("Refresh API Monitor") {
+                                            Task { await model.refreshAPIRateSnapshot() }
+                                        }
+                                        .buttonStyle(.bordered)
+
+                                        Spacer()
+
+                                        if let lastAt = snapshot.lastRequestAt {
+                                            Text("Last request \(Self.timeFormatter.string(from: lastAt))")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         HStack {
@@ -423,5 +526,21 @@ extension ClawBarView {
         case .error:
             return .red
         }
+    }
+
+    private func currency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = 4
+        formatter.minimumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? String(format: "$%.4f", value)
+    }
+
+    private func relativeTime(_ date: Date?) -> String {
+        guard let date else { return "never" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
