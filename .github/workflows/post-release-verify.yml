@@ -1,0 +1,44 @@
+name: Post Release Verify
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-assets-and-signature:
+    runs-on: macos-15
+    steps:
+      - name: Prepare artifact URLs
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          REPO="${{ github.repository }}"
+          echo "DMG_URL=https://github.com/${REPO}/releases/download/${TAG}/ClawBar.dmg" >> "$GITHUB_ENV"
+          echo "SHA_URL=https://github.com/${REPO}/releases/download/${TAG}/ClawBar.dmg.sha256" >> "$GITHUB_ENV"
+
+      - name: Download release artifacts
+        run: |
+          curl -fL "$DMG_URL" -o ClawBar.dmg
+          curl -fL "$SHA_URL" -o ClawBar.dmg.sha256
+
+      - name: Verify SHA256 checksum
+        run: |
+          expected="$(awk 'NF {print $1; exit}' ClawBar.dmg.sha256 | tr '[:upper:]' '[:lower:]')"
+          actual="$(shasum -a 256 ClawBar.dmg | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
+          if [[ -z "$expected" ]]; then
+            echo "error: checksum file did not contain a hash"
+            exit 1
+          fi
+          if [[ "$actual" != "$expected" ]]; then
+            echo "error: checksum mismatch"
+            echo "expected=$expected"
+            echo "actual=$actual"
+            exit 1
+          fi
+          echo "Checksum verified: $actual"
+
+      - name: Gatekeeper assess DMG
+        run: |
+          spctl -a -t open --context context:primary-signature -v ClawBar.dmg

@@ -39,6 +39,10 @@ enum UpdateChecker {
             throw ClawBarError.networkError(readableStatusMessage(statusCode: http.statusCode, body: data))
         }
 
+        return try updateInfo(fromReleaseData: data, currentVersion: currentVersion)
+    }
+
+    static func updateInfo(fromReleaseData data: Data, currentVersion: String) throws -> UpdateInfo? {
         let release: GitHubRelease
         do {
             release = try JSONDecoder().decode(GitHubRelease.self, from: data)
