@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let view = ClawBarView(model: model)
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 360, height: 420)
+        popover.contentSize = NSSize(width: 395, height: 480)
         popover.contentViewController = NSHostingController(rootView: view)
 
         statusBarController = StatusBarController(popover: popover)

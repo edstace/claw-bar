@@ -15,6 +15,8 @@ extension ClawBarView {
             } label: {
                 Image(systemName: "square.and.pencil")
                     .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("New chat")
@@ -25,6 +27,8 @@ extension ClawBarView {
             } label: {
                 Image(systemName: model.hasSavedAPIKey ? "slider.horizontal.3" : "exclamationmark.triangle.fill")
                     .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("API key settings")
@@ -35,6 +39,8 @@ extension ClawBarView {
             } label: {
                 Image(systemName: "power")
                     .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Quit ClawBar")
@@ -107,11 +113,13 @@ extension ClawBarView {
                 ZStack(alignment: .bottom) {
                     GeometryReader { geo in
                         Color.clear
+                            .allowsHitTesting(false)
                             .onAppear { scrollViewportHeight = geo.size.height }
                             .onChange(of: geo.size.height) { _, newHeight in
                                 scrollViewportHeight = newHeight
                             }
                     }
+                    .allowsHitTesting(false)
 
                     ScrollView {
                         if model.chatEntries.isEmpty {
