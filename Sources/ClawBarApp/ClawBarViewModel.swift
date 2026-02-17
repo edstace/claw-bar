@@ -58,6 +58,12 @@ public final class ClawBarViewModel: ObservableObject {
     @Published var isDownloadingUpdate: Bool = false
     @Published var lastUpdateCheckAt: Date?
     @Published var apiRateSnapshot: OpenAIAPIRateSnapshot = .empty
+    @Published var gatewayEnabled: Bool = false
+    @Published var gatewayURL: String = ""
+    @Published var gatewayToken: String = ""
+    @Published var gatewayAgentId: String = "main"
+    @Published var isTestingGateway: Bool = false
+    @Published var gatewayTestResult: String?
 
     // MARK: - Private
 
@@ -103,6 +109,7 @@ public final class ClawBarViewModel: ObservableObject {
         loadVoiceSettings()
         loadSpeechDetectionSettings()
         loadLiveVoiceSettings()
+        loadGatewaySettings()
         skippedUpdateVersion = UserDefaults.standard.string(forKey: updateSkippedVersionKey)
         launchAtLoginEnabled = LaunchAgentManager.isEnabled()
         restoreSession()

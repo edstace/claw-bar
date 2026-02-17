@@ -176,6 +176,78 @@ extension ClawBarView {
                                 }
                             }
 
+                        case .connection:
+                            settingsCard("Connection Mode", systemImage: "network") {
+                                Picker("Mode", selection: $model.gatewayEnabled) {
+                                    Text("Local CLI").tag(false)
+                                    Text("Remote Gateway").tag(true)
+                                }
+                                .pickerStyle(.segmented)
+
+                                if model.gatewayEnabled {
+                                    Text("Connect directly to a remote OpenClaw Gateway via WebSocket. No local CLI or Node.js required.")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Text("Use the local `openclaw` CLI to relay messages. Requires OpenClaw CLI + Node.js installed on this Mac.")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            if model.gatewayEnabled {
+                                settingsCard("Gateway Settings", systemImage: "server.rack") {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Gateway URL")
+                                            .font(.callout)
+                                            .foregroundStyle(.secondary)
+                                        TextField("ws://10.0.0.5:18789", text: $model.gatewayURL)
+                                            .textFieldStyle(.roundedBorder)
+                                        Text("WebSocket URL of the OpenClaw gateway (ws:// or wss://)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Auth Token")
+                                            .font(.callout)
+                                            .foregroundStyle(.secondary)
+                                        SecureField("Gateway token", text: $model.gatewayToken)
+                                            .textFieldStyle(.roundedBorder)
+                                        Text("The token from your gateway config (gateway.auth.token)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Agent ID")
+                                            .font(.callout)
+                                            .foregroundStyle(.secondary)
+                                        TextField("main", text: $model.gatewayAgentId)
+                                            .textFieldStyle(.roundedBorder)
+                                    }
+
+                                    HStack {
+                                        Button("Save & Apply") {
+                                            model.saveGatewaySettings()
+                                        }
+                                        .buttonStyle(.borderedProminent)
+
+                                        Button(model.isTestingGateway ? "Testing…" : "Test Connection") {
+                                            model.testGatewayConnection()
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .disabled(model.isTestingGateway || model.gatewayURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                    }
+
+                                    if let result = model.gatewayTestResult {
+                                        Text(result)
+                                            .font(.caption)
+                                            .foregroundStyle(result.contains("✅") ? .green : .red)
+                                    }
+                                }
+                            }
+
                         case .voice:
                             settingsCard("Live Voice", systemImage: "waveform.badge.mic") {
                                 Picker("Mode", selection: Binding(
