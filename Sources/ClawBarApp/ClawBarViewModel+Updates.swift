@@ -110,12 +110,12 @@ extension ClawBarViewModel {
             do {
                 var dmgRequest = URLRequest(url: url)
                 dmgRequest.setValue("application/x-apple-diskimage,application/octet-stream", forHTTPHeaderField: "Accept")
-                let (data, dmgResponse) = try await URLSession.shared.data(for: dmgRequest)
+                let (data, dmgResponse) = try await fetchWithRetry(request: dmgRequest, expectedKind: .dmg)
                 try UpdateChecker.validateBinaryDownloadResponse(dmgResponse, data: data, expectedKind: .dmg)
 
                 var checksumRequest = URLRequest(url: checksumURL)
                 checksumRequest.setValue("text/plain,application/octet-stream", forHTTPHeaderField: "Accept")
-                let (checksumData, checksumResponse) = try await URLSession.shared.data(for: checksumRequest)
+                let (checksumData, checksumResponse) = try await fetchWithRetry(request: checksumRequest, expectedKind: .checksum)
                 try UpdateChecker.validateBinaryDownloadResponse(checksumResponse, data: checksumData, expectedKind: .checksum)
                 let checksumText = String(data: checksumData, encoding: .utf8) ?? ""
                 guard let expected = UpdateChecker.expectedSHA256(from: checksumText) else {
@@ -140,6 +140,45 @@ extension ClawBarViewModel {
                 }
             }
         }
+    }
+
+    private func fetchWithRetry(request: URLRequest, expectedKind: UpdateChecker.DownloadKind) async throws -> (Data, URLResponse) {
+        let maxAttempts = 3
+        var lastError: Error?
+
+        for attempt in 0..<maxAttempts {
+            do {
+                let result = try await URLSession.shared.data(for: request)
+                return result
+            } catch {
+                lastError = error
+                let canRetry = isRetryableUpdateDownloadError(error, expectedKind: expectedKind)
+                if !canRetry || attempt == maxAttempts - 1 {
+                    throw error
+                }
+                let delayMs = Int(pow(2.0, Double(attempt)) * 400.0)
+                try? await Task.sleep(for: .milliseconds(delayMs))
+            }
+        }
+
+        throw lastError ?? ClawBarError.networkError("Update download failed unexpectedly.")
+    }
+
+    private func isRetryableUpdateDownloadError(_ error: Error, expectedKind _: UpdateChecker.DownloadKind) -> Bool {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .resourceUnavailable:
+                return true
+            default:
+                return false
+            }
+        }
+
+        let text = error.localizedDescription.lowercased()
+        return text.contains("timed out") ||
+            text.contains("network") ||
+            text.contains("temporar") ||
+            text.contains("connection reset")
     }
 
     func skipAvailableUpdate() {

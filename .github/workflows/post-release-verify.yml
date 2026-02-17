@@ -42,3 +42,26 @@ jobs:
       - name: Gatekeeper assess DMG
         run: |
           spctl -a -t open --context context:primary-signature -v ClawBar.dmg
+
+      - name: Mount DMG and run smoke test from published app
+        run: |
+          set -euo pipefail
+          ATTACH_OUTPUT="$(hdiutil attach ClawBar.dmg -nobrowse -readonly)"
+          DEVICE="$(echo "$ATTACH_OUTPUT" | awk '/\/Volumes\// {dev=$1} END{print dev}')"
+          MOUNT_POINT="$(echo "$ATTACH_OUTPUT" | awk '/\/Volumes\// {mp=substr($0, index($0, "/Volumes/"))} END{print mp}')"
+          if [[ -z "$DEVICE" || -z "$MOUNT_POINT" ]]; then
+            echo "error: failed to mount DMG"
+            echo "$ATTACH_OUTPUT"
+            exit 1
+          fi
+
+          cleanup() {
+            hdiutil detach "$DEVICE" -force || true
+          }
+          trap cleanup EXIT
+
+          APP_PATH="$MOUNT_POINT/ClawBar.app"
+          BIN_PATH="$APP_PATH/Contents/MacOS/ClawBarApp"
+          test -d "$APP_PATH"
+          test -x "$BIN_PATH"
+          "$BIN_PATH" --smoke-test
