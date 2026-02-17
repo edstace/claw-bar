@@ -73,6 +73,50 @@ extension ClawBarViewModel {
         return prompt.isEmpty ? nil : prompt
     }
 
+    // MARK: - Gateway Settings
+
+    func loadGatewaySettings() {
+        gatewayEnabled = GatewayRelay.isEnabled
+        gatewayURL = GatewayRelay.gatewayURL
+        gatewayToken = GatewayRelay.gatewayToken
+        gatewayAgentId = GatewayRelay.agentId
+    }
+
+    func saveGatewaySettings() {
+        GatewayRelay.setEnabled(gatewayEnabled)
+        GatewayRelay.gatewayURL = gatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        GatewayRelay.gatewayToken = gatewayToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        GatewayRelay.agentId = gatewayAgentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        statusMessage = gatewayEnabled ? "Gateway mode enabled" : "CLI mode enabled"
+        Task { await refreshSetupChecks() }
+    }
+
+    func testGatewayConnection() {
+        isTestingGateway = true
+        gatewayTestResult = nil
+
+        // Temporarily apply settings for the test
+        GatewayRelay.setEnabled(true)
+        GatewayRelay.gatewayURL = gatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        GatewayRelay.gatewayToken = gatewayToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        GatewayRelay.agentId = gatewayAgentId.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        Task {
+            let reachable = await GatewayRelay.ping()
+            // Restore actual enabled state
+            GatewayRelay.setEnabled(gatewayEnabled)
+
+            isTestingGateway = false
+            if reachable {
+                gatewayTestResult = "✅ Connected successfully"
+                statusMessage = "Gateway connection test passed"
+            } else {
+                gatewayTestResult = "❌ Connection failed — check URL and token"
+                statusMessage = "Gateway connection test failed"
+            }
+        }
+    }
+
     // MARK: - Recording
 
     func toggleRecording() {
@@ -296,33 +340,50 @@ extension ClawBarViewModel {
         checks.append(micCheck)
 
         let relayDiagnostics = await OpenClawRelay.diagnostics()
-        checks.append(
-            SetupCheck(
-                key: "openclaw_cli",
-                title: "OpenClaw CLI",
-                level: relayDiagnostics.cliPath == nil ? .error : .ok,
-                detail: relayDiagnostics.cliPath ?? "Not found in known locations or PATH.",
-                hint: relayDiagnostics.cliPath == nil ? "Install OpenClaw CLI or set OPENCLAW_CLI_PATH to the binary path." : nil
+
+        if relayDiagnostics.mode == .gateway {
+            // Gateway WebSocket mode — no CLI/Node needed
+            checks.append(
+                SetupCheck(
+                    key: "gateway_connection",
+                    title: "Gateway Connection",
+                    level: relayDiagnostics.relayReachable ? .ok : .error,
+                    detail: relayDiagnostics.relayReachable
+                        ? "Connected to \(relayDiagnostics.cliPath ?? "gateway")."
+                        : (relayDiagnostics.detail ?? "Gateway unreachable."),
+                    hint: relayDiagnostics.relayReachable ? nil : "Check the gateway URL and token in Settings → Connection."
+                )
             )
-        )
-        checks.append(
-            SetupCheck(
-                key: "node_runtime",
-                title: "Node Runtime",
-                level: relayDiagnostics.nodePath == nil ? .error : .ok,
-                detail: relayDiagnostics.nodePath ?? "node not found for OpenClaw launcher.",
-                hint: relayDiagnostics.nodePath == nil ? "Install Node.js or add it to PATH (for example ~/.n/bin)." : nil
+        } else {
+            // CLI mode — need openclaw + node
+            checks.append(
+                SetupCheck(
+                    key: "openclaw_cli",
+                    title: "OpenClaw CLI",
+                    level: relayDiagnostics.cliPath == nil ? .error : .ok,
+                    detail: relayDiagnostics.cliPath ?? "Not found in known locations or PATH.",
+                    hint: relayDiagnostics.cliPath == nil ? "Install OpenClaw CLI, set OPENCLAW_CLI_PATH, or switch to Gateway mode in Settings → Connection." : nil
+                )
             )
-        )
-        checks.append(
-            SetupCheck(
-                key: "openclaw_gateway",
-                title: "OpenClaw Gateway",
-                level: relayDiagnostics.relayReachable ? .ok : .warning,
-                detail: relayDiagnostics.relayReachable ? "Reachable via `openclaw status --json`." : (relayDiagnostics.detail ?? "Unavailable."),
-                hint: relayDiagnostics.relayReachable ? nil : "Run `openclaw status --json` in Terminal to inspect service health."
+            checks.append(
+                SetupCheck(
+                    key: "node_runtime",
+                    title: "Node Runtime",
+                    level: relayDiagnostics.nodePath == nil ? .error : .ok,
+                    detail: relayDiagnostics.nodePath ?? "node not found for OpenClaw launcher.",
+                    hint: relayDiagnostics.nodePath == nil ? "Install Node.js or switch to Gateway mode." : nil
+                )
             )
-        )
+            checks.append(
+                SetupCheck(
+                    key: "openclaw_gateway",
+                    title: "OpenClaw Gateway",
+                    level: relayDiagnostics.relayReachable ? .ok : .warning,
+                    detail: relayDiagnostics.relayReachable ? "Reachable via `openclaw status --json`." : (relayDiagnostics.detail ?? "Unavailable."),
+                    hint: relayDiagnostics.relayReachable ? nil : "Run `openclaw status --json` in Terminal or switch to Gateway mode."
+                )
+            )
+        }
 
         setupChecks = checks
         applyStartupSelfHealBanner(from: checks)
@@ -379,6 +440,8 @@ extension ClawBarViewModel {
             return "brew install node"
         case "openclaw_gateway":
             return "openclaw status --json"
+        case "gateway_connection":
+            return nil // No CLI command — handled via Settings
         default:
             return nil
         }
@@ -563,10 +626,6 @@ extension ClawBarViewModel {
         }
         appendChat(role: .user, text: text, attachments: attachments)
         statusMessage = "Transcribed ✓"
-        if isLiveVoiceEnabled {
-            composerText = "You: \(text)"
-        }
-
         if relayToOpenClaw {
             await relayText(text, attachments: attachments)
         } else if isLiveVoiceEnabled {
@@ -587,9 +646,7 @@ extension ClawBarViewModel {
                 appendChat(role: .assistant, text: result.text, attachments: [])
                 latestTranscript = result.text
                 statusMessage = "Relay complete ✓"
-                if isLiveVoiceEnabled {
-                    composerText = "You: \(text)\nOpenClaw: \(result.text)"
-                }
+                composerText = ""
                 if isLiveVoiceEnabled {
                     await speak(text: result.text)
                 }

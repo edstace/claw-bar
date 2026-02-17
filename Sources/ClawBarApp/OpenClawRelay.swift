@@ -1,10 +1,24 @@
 import Foundation
 
+public enum RelayMode: Sendable {
+    case cli
+    case gateway
+}
+
 public struct OpenClawDiagnostics: Sendable {
     let cliPath: String?
     let nodePath: String?
     let relayReachable: Bool
     let detail: String?
+    let mode: RelayMode
+
+    init(cliPath: String? = nil, nodePath: String? = nil, relayReachable: Bool = false, detail: String? = nil, mode: RelayMode = .cli) {
+        self.cliPath = cliPath
+        self.nodePath = nodePath
+        self.relayReachable = relayReachable
+        self.detail = detail
+        self.mode = mode
+    }
 }
 
 public struct OpenClawRelayResult: Sendable {
@@ -21,13 +35,19 @@ public enum OpenClawRelay {
     private static var cachedExecutablePath: String?
 
     /// Send a text message to OpenClaw and return the first text reply.
-    /// Prefer the CLI bridge because OpenClaw's gateway is not a simple REST endpoint.
+    /// Routes through Gateway WebSocket when enabled, falls back to CLI.
     static func send(text: String, attachments: [AttachmentItem]) async throws -> OpenClawRelayResult {
-        try await sendViaCLI(text: text, attachments: attachments)
+        if GatewayRelay.isEnabled {
+            return try await GatewayRelay.send(text: text, attachments: attachments)
+        }
+        return try await sendViaCLI(text: text, attachments: attachments)
     }
 
     static func rotateSession() {
         relaySessionId = "clawbar-relay-\(UUID().uuidString)"
+        if GatewayRelay.isEnabled {
+            GatewayRelay.rotateSession()
+        }
     }
 
     private static func sendViaCLI(text: String, attachments: [AttachmentItem]) async throws -> OpenClawRelayResult {
@@ -320,6 +340,9 @@ public enum OpenClawRelay {
 
     /// Quick health check — is OpenClaw gateway reachable? (best-effort)
     static func ping() async -> Bool {
+        if GatewayRelay.isEnabled {
+            return await GatewayRelay.ping()
+        }
         do {
             _ = try await runOpenClawCommand(arguments: ["status", "--json"])
             return true
@@ -329,6 +352,16 @@ public enum OpenClawRelay {
     }
 
     static func diagnostics() async -> OpenClawDiagnostics {
+        if GatewayRelay.isEnabled {
+            let gw = await GatewayRelay.diagnostics()
+            return OpenClawDiagnostics(
+                cliPath: gw.url,
+                nodePath: nil,
+                relayReachable: gw.reachable,
+                detail: gw.detail,
+                mode: .gateway
+            )
+        }
         do {
             let cliPath = try resolveOpenClawExecutablePath()
             let env = buildProcessEnvironment(executablePath: cliPath)
@@ -338,14 +371,16 @@ public enum OpenClawRelay {
                 cliPath: cliPath,
                 nodePath: nodePath,
                 relayReachable: reachable,
-                detail: reachable ? nil : "OpenClaw status check failed."
+                detail: reachable ? nil : "OpenClaw status check failed.",
+                mode: .cli
             )
         } catch {
             return OpenClawDiagnostics(
                 cliPath: nil,
                 nodePath: nil,
                 relayReachable: false,
-                detail: error.localizedDescription
+                detail: error.localizedDescription,
+                mode: .cli
             )
         }
     }

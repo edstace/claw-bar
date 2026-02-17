@@ -77,6 +77,7 @@ struct BottomSentinelPreferenceKey: PreferenceKey {
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
+    case connection
     case voice
     case diagnostics
 
@@ -86,6 +87,8 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "General"
+        case .connection:
+            return "Connection"
         case .voice:
             return "Voice"
         case .diagnostics:
@@ -97,6 +100,8 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "gearshape.fill"
+        case .connection:
+            return "network"
         case .voice:
             return "waveform.badge.mic"
         case .diagnostics:

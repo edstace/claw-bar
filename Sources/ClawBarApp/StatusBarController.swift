@@ -26,7 +26,11 @@ final class StatusBarController {
             popover.performClose(sender)
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.becomeKey()
+            // Ensure the popover window is key and accepts mouse events
+            if let window = popover.contentViewController?.view.window {
+                window.becomeKey()
+                window.makeKey()
+            }
         }
     }
 
